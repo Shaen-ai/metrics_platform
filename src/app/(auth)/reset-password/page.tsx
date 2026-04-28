@@ -5,14 +5,16 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useStore, useHydration } from "@/lib/store";
 import { Button, Input, Card, CardHeader, CardTitle, CardContent } from "@/components/ui";
-import { getTranslation, LanguageCode, languages } from "@/lib/translations";
+import { getTranslation } from "@/lib/translations";
+import { AUTH_PAGE_LANG } from "@/lib/authPageLang";
+import { getLandingUrl } from "@/lib/landingUrl";
+import Image from "next/image";
 
 function ResetPasswordForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { resetPassword, isAuthenticated } = useStore();
   const hydrated = useHydration();
-  const [lang, setLang] = useState<LanguageCode>("en");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
@@ -21,7 +23,7 @@ function ResetPasswordForm() {
   const email = searchParams.get("email") || "";
   const token = searchParams.get("token") || "";
 
-  const t = (key: string) => getTranslation(lang, key);
+  const t = (key: string) => getTranslation(AUTH_PAGE_LANG, key);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -74,25 +76,21 @@ function ResetPasswordForm() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#FFF8F0] p-4">
       <Card className="w-full max-w-md rounded-2xl border-[#F0E6D8] shadow-sm">
-        <CardHeader className="text-center">
-          <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-[#E8772E] flex items-center justify-center shadow-sm">
-            <span className="text-white font-bold text-2xl">T</span>
-          </div>
-          <div className="flex justify-center gap-2 mb-4">
-            {languages.map((l) => (
-              <button
-                key={l.code}
-                onClick={() => setLang(l.code)}
-                className={`text-xl p-1 rounded-lg ${
-                  lang === l.code ? "bg-[#FEF3E7] ring-2 ring-[#E8772E]" : ""
-                }`}
-                title={l.name}
-                type="button"
-              >
-                {l.flag}
-              </button>
-            ))}
-          </div>
+        <CardHeader className="items-center text-center">
+          <Link
+            href={getLandingUrl()}
+            className="relative mb-4 h-[200px] w-[min(100%,220px)] shrink-0 rounded-md outline-offset-4 transition-opacity hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#E8772E]"
+            aria-label={t("auth.logoHomeAria")}
+          >
+            <Image
+              src="/tunzone-logo.png"
+              alt=""
+              fill
+              className="object-contain object-center"
+              sizes="220px"
+              priority
+            />
+          </Link>
           <CardTitle className="text-2xl text-[#1A1A1A]">{t("auth.setNewPassword")}</CardTitle>
         </CardHeader>
         <CardContent>

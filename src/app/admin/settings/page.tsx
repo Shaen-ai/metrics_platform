@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import { useStore } from "@/lib/store";
 import { Card, CardHeader, CardTitle, CardContent, Button, Input } from "@/components/ui";
-import { Copy, Check, ExternalLink, Globe, CreditCard, Layers, LayoutGrid, Crown, Palette } from "lucide-react";
+import { Copy, Check, ExternalLink, Globe, CreditCard, Layers, LayoutGrid, Crown, Palette, Upload, Loader2 } from "lucide-react";
 import { languages, normalizeLanguageCode } from "@/lib/translations";
 import { currencies } from "@/lib/constants";
 import { useTranslation } from "@/hooks/useTranslation";
@@ -15,6 +15,8 @@ import {
 } from "@/lib/billingLinks";
 import { DEFAULT_PUBLIC_SITE_LAYOUT, publicSiteLayouts, publicSiteTextFields } from "@/lib/publicSite";
 import type { PublicSiteTexts } from "@/lib/types";
+import { api } from "@/lib/api";
+import { uploadErrorUserMessage } from "@/lib/uploadLimits";
 
 export default function SettingsPage() {
   const { t } = useTranslation();
@@ -38,6 +40,9 @@ export default function SettingsPage() {
   const [paypalSaved, setPaypalSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [logoError, setLogoError] = useState<string | null>(null);
+  const logoFileInputRef = useRef<HTMLInputElement>(null);
   const [siteLayout, setSiteLayout] = useState(currentUser?.publicSiteLayout || DEFAULT_PUBLIC_SITE_LAYOUT);
   const [siteTexts, setSiteTexts] = useState<PublicSiteTexts>(currentUser?.publicSiteTexts || {});
   const [siteSaving, setSiteSaving] = useState(false);
@@ -144,6 +149,29 @@ export default function SettingsPage() {
     setIsSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
+  };
+
+  const handleLogoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setLogoError(null);
+    setLogoUploading(true);
+    try {
+      const { url } = await api.uploadImage(file);
+      setFormData((p) => ({ ...p, logo: url }));
+      await updateUser({ logo: url });
+    } catch (err) {
+      setLogoError(uploadErrorUserMessage(err, t));
+    } finally {
+      setLogoUploading(false);
+    }
+  };
+
+  const handleLogoRemove = async () => {
+    setLogoError(null);
+    setFormData((p) => ({ ...p, logo: "" }));
+    await updateUser({ logo: "" });
   };
 
   const handleLanguageChange = (lang: string) => {
@@ -660,12 +688,59 @@ export default function SettingsPage() {
             value={formData.companyName}
             onChange={(e) => setFormData((p) => ({ ...p, companyName: e.target.value }))}
           />
-          <Input
-            label={t("settings.logoUrl")}
-            placeholder="https://example.com/logo.png"
-            value={formData.logo}
-            onChange={(e) => setFormData((p) => ({ ...p, logo: e.target.value }))}
-          />
+          <div className="space-y-2">
+            <div>
+              <span className="text-sm font-medium leading-none">{t("settings.logo")}</span>
+              <p className="text-xs text-[var(--muted-foreground)] mt-1.5">{t("settings.logoHint")}</p>
+            </div>
+            <div className="flex flex-wrap items-start gap-4">
+              <div className="h-20 w-20 rounded-lg border border-[var(--border)] bg-[var(--muted)] shrink-0 flex items-center justify-center overflow-hidden">
+                {formData.logo ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- user-uploaded dynamic URL from API
+                  <img src={formData.logo} alt="" className="max-h-full max-w-full object-contain p-1" />
+                ) : (
+                  <span className="text-[10px] text-center text-[var(--muted-foreground)] px-1">{t("settings.logoEmpty")}</span>
+                )}
+              </div>
+              <div className="flex flex-col gap-2 min-w-0">
+                <input
+                  ref={logoFileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/gif,image/webp"
+                  className="sr-only"
+                  aria-label={t("settings.logoUpload")}
+                  disabled={logoUploading}
+                  onChange={handleLogoFileChange}
+                />
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={logoUploading}
+                    onClick={() => logoFileInputRef.current?.click()}
+                  >
+                    {logoUploading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        {t("settings.logoUploading")}
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-4 h-4 mr-2" />
+                        {t("settings.logoUpload")}
+                      </>
+                    )}
+                  </Button>
+                  {formData.logo ? (
+                    <Button type="button" variant="ghost" disabled={logoUploading} onClick={handleLogoRemove}>
+                      {t("settings.logoRemove")}
+                    </Button>
+                  ) : null}
+                </div>
+                {logoError ? <p className="text-sm text-destructive">{logoError}</p> : null}
+              </div>
+            </div>
+          </div>
           <Button onClick={handleSave} isLoading={isSaving}>
             {saved ? (
               <>

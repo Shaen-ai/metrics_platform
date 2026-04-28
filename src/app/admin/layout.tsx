@@ -27,10 +27,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const router = useRouter();
   const pathname = usePathname();
   const { t } = useTranslation();
-  const { currentUser, isAuthenticated, logout, getModeById, getSubModesByIds, fetchModes, updateUser } = useStore();
+  const { currentUser, isAuthenticated, logout, getModeById, getSubModesByIds, fetchModes, updateUser, restoreSession } = useStore();
   const hydrated = useHydration();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    void restoreSession();
+  }, [hydrated, restoreSession]);
 
   useEffect(() => {
     if (isAuthenticated) fetchModes().catch(() => {});

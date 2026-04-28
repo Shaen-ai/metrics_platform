@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useStore, useHydration } from "@/lib/store";
 import { Button, Input, Card, CardHeader, CardTitle, CardContent } from "@/components/ui";
-import { getTranslation, LanguageCode, languages } from "@/lib/translations";
+import { getTranslation } from "@/lib/translations";
+import { AUTH_PAGE_LANG } from "@/lib/authPageLang";
 import { getLandingUrl } from "@/lib/landingUrl";
 import Image from "next/image";
 
@@ -13,7 +14,6 @@ export default function SignupPage() {
   const router = useRouter();
   const { signup, isAuthenticated } = useStore();
   const hydrated = useHydration();
-  const [lang, setLang] = useState<LanguageCode>("en");
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -25,7 +25,7 @@ export default function SignupPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
 
-  const t = (key: string) => getTranslation(lang, key);
+  const t = (key: string) => getTranslation(AUTH_PAGE_LANG, key);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -83,21 +83,6 @@ export default function SignupPage() {
               priority
             />
           </Link>
-          {/* Language Selector */}
-          <div className="flex justify-center gap-2 mb-4">
-            {languages.map((l) => (
-              <button
-                key={l.code}
-                onClick={() => setLang(l.code)}
-                className={`text-xl p-1 rounded-lg ${
-                  lang === l.code ? "bg-[#FEF3E7] ring-2 ring-[#E8772E]" : ""
-                }`}
-                title={l.name}
-              >
-                {l.flag}
-              </button>
-            ))}
-          </div>
           <CardTitle className="text-2xl text-[#1A1A1A]">{t("auth.createAccount")}</CardTitle>
           <p className="text-[#6B7280] mt-2">
             {t("auth.startBuilding")}

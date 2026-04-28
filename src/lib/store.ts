@@ -286,7 +286,8 @@ export const useStore = create<AppState>()(
           const res = await api.getProfile();
           set({ currentUser: normalizeUserFromApi(res.user as User), isAuthenticated: true });
         } catch {
-          /* ignore */
+          api.setToken(null);
+          set({ currentUser: null, isAuthenticated: false });
         }
       },
 

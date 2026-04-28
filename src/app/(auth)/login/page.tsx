@@ -5,34 +5,44 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useStore, useHydration } from "@/lib/store";
 import { Button, Input, Card, CardHeader, CardTitle, CardContent } from "@/components/ui";
-import {
-  getTranslation,
-  LanguageCode,
-  languages,
-  localizeAuthApiError,
-} from "@/lib/translations";
+import { getTranslation, localizeAuthApiError } from "@/lib/translations";
+import { AUTH_PAGE_LANG } from "@/lib/authPageLang";
 import { getLandingUrl } from "@/lib/landingUrl";
 import Image from "next/image";
+
+function safeNextPath(raw: string | null): string | null {
+  if (!raw) return null;
+  try {
+    const decoded = decodeURIComponent(raw);
+    if (!decoded.startsWith("/") || decoded.startsWith("//")) return null;
+    if (decoded.includes("://")) return null;
+    return decoded;
+  } catch {
+    return null;
+  }
+}
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { login, isAuthenticated, currentUser } = useStore();
   const hydrated = useHydration();
-  const [lang, setLang] = useState<LanguageCode>("en");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const t = (key: string) => getTranslation(lang, key);
+  const t = (key: string) => getTranslation(AUTH_PAGE_LANG, key);
 
   const verified = searchParams.get("verified");
   const verification = searchParams.get("verification");
   const passwordReset = searchParams.get("reset");
+  const billingSuccess = searchParams.get("billing") === "success";
 
   const infoMessage =
-    verified === "1"
+    billingSuccess
+      ? t("auth.billingSuccess")
+      : verified === "1"
       ? t("auth.emailVerified")
       : verification === "invalid"
         ? t("auth.verificationInvalid")
@@ -46,13 +56,18 @@ function LoginForm() {
     if (!hydrated) return;
 
     if (isAuthenticated) {
+      const next = safeNextPath(searchParams.get("next"));
+      if (next) {
+        router.push(next);
+        return;
+      }
       if (currentUser?.selectedModeId && currentUser?.selectedSubModeIds?.length) {
         router.push("/admin");
       } else {
         router.push("/admin/modes");
       }
     }
-  }, [hydrated, isAuthenticated, currentUser, router]);
+  }, [hydrated, isAuthenticated, currentUser, router, searchParams]);
 
   if (!hydrated || isAuthenticated) {
     return null;
@@ -68,7 +83,7 @@ function LoginForm() {
     const result = await login({ email, password });
     if (!result.success) {
       const raw = result.error || "Login failed";
-      setError(localizeAuthApiError(lang, raw));
+      setError(localizeAuthApiError(AUTH_PAGE_LANG, raw));
     }
     setIsLoading(false);
   };
@@ -91,22 +106,6 @@ function LoginForm() {
               priority
             />
           </Link>
-          {/* Language Selector */}
-          <div className="flex justify-center gap-2 mb-4">
-            {languages.map((l) => (
-              <button
-                key={l.code}
-                onClick={() => setLang(l.code)}
-                className={`text-xl p-1 rounded-lg ${
-                  lang === l.code ? "bg-[#FEF3E7] ring-2 ring-[#E8772E]" : ""
-                }`}
-                title={l.name}
-                type="button"
-              >
-                {l.flag}
-              </button>
-            ))}
-          </div>
           <CardTitle className="text-2xl text-[#1A1A1A]">{t("auth.welcomeBack")}</CardTitle>
           <p className="text-[#6B7280] mt-2">
             {t("auth.signInToAccount")}
