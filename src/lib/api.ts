@@ -2,8 +2,9 @@ import {
   isFileOverMaxUpload,
   MaxUploadError,
 } from "./uploadLimits";
+import { publicApiUrl } from "./publicEnv";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+const API_URL = publicApiUrl;
 
 const MAX_RETRIES = 2;
 

@@ -13,6 +13,10 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: "https",
+        hostname: "tunzone.com",
+      },
+      {
+        protocol: "https",
         hostname: "**",
       },
       {

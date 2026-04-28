@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getPublicApiUrl } from "@/lib/publicEnv";
+
 
 const MESHY_BASE_URL = "https://api.meshy.ai/openapi/v1";
-const BACKEND_API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+const BACKEND_API_URL = getPublicApiUrl();
 
 const STATUS_MAP: Record<string, string> = {
   PENDING: "queued",

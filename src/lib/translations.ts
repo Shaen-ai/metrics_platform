@@ -59,7 +59,6 @@ export const translations: Record<LanguageCode, Record<string, string>> = {
     "auth.startBuilding": "Start building your catalog",
     "auth.dontHaveAccount": "No account?",
     "auth.alreadyHaveAccount": "Have an account?",
-    "auth.demoCredentials": "Demo credentials",
     "auth.signingIn": "Signing in...",
     "auth.creatingAccount": "Creating...",
     "auth.forgotPassword": "Forgot password?",
@@ -70,6 +69,7 @@ export const translations: Record<LanguageCode, Record<string, string>> = {
     "auth.sendingReset": "Sending...",
     "auth.checkEmailInbox": "If that email is registered, you will receive a link shortly.",
     "auth.backToSignIn": "Back to sign in",
+    "auth.logoHomeAria": "Go to Tunzone website",
     "auth.signupCheckEmail":
       "We sent a link to your email. Open it to verify your account, then sign in here.",
     "auth.emailVerified": "Your email is verified. You can sign in now.",
@@ -80,6 +80,8 @@ export const translations: Record<LanguageCode, Record<string, string>> = {
     "auth.resettingPassword": "Saving...",
     "auth.saveNewPassword": "Update password",
     "auth.passwordMismatch": "Passwords do not match",
+    "auth.verifyEmailBeforeSignIn":
+      "Please verify your email using the link we sent you before signing in.",
     "nav.dashboard": "Dashboard",
     "nav.catalog": "Catalog",
     "nav.materials": "Materials",
@@ -466,7 +468,6 @@ export const translations: Record<LanguageCode, Record<string, string>> = {
     "auth.startBuilding": "Начните создавать каталог",
     "auth.dontHaveAccount": "Нет аккаунта?",
     "auth.alreadyHaveAccount": "Есть аккаунт?",
-    "auth.demoCredentials": "Демо данные",
     "auth.signingIn": "Вход...",
     "auth.creatingAccount": "Создание...",
     "auth.forgotPassword": "Забыли пароль?",
@@ -477,6 +478,7 @@ export const translations: Record<LanguageCode, Record<string, string>> = {
     "auth.sendingReset": "Отправка...",
     "auth.checkEmailInbox": "Если email зарегистрирован, письмо придёт вскоре.",
     "auth.backToSignIn": "Назад к входу",
+    "auth.logoHomeAria": "Перейти на сайт Tunzone",
     "auth.signupCheckEmail":
       "Мы отправили ссылку на email. Подтвердите адрес по ссылке, затем войдите.",
     "auth.emailVerified": "Email подтверждён. Можно войти.",
@@ -487,6 +489,8 @@ export const translations: Record<LanguageCode, Record<string, string>> = {
     "auth.resettingPassword": "Сохранение...",
     "auth.saveNewPassword": "Сохранить пароль",
     "auth.passwordMismatch": "Пароли не совпадают",
+    "auth.verifyEmailBeforeSignIn":
+      "Перед входом подтвердите email по ссылке из письма, которое мы вам отправили.",
     "nav.dashboard": "Панель",
     "nav.catalog": "Каталог",
     "nav.materials": "Материалы",
@@ -833,4 +837,14 @@ export const translations: Record<LanguageCode, Record<string, string>> = {
 export function getTranslation(lang: LanguageCode | string, key: string): string {
   const code = normalizeLanguageCode(lang);
   return translations[code]?.[key] || translations.en[key] || key;
+}
+
+/** Map Laravel `/auth/login` JSON `message` strings to translated copy by UI language */
+export function localizeAuthApiError(lang: LanguageCode | string, message: string): string {
+  const key =
+    ({
+      "Please verify your email using the link we sent you before signing in.":
+        "auth.verifyEmailBeforeSignIn",
+    } as Record<string, string>)[message.trim()];
+  return key ? getTranslation(lang, key) : message;
 }

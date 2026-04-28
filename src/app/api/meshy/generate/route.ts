@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getPublicApiUrl } from "@/lib/publicEnv";
+
 
 const MESHY_BASE_URL = "https://api.meshy.ai/openapi/v1";
-const LARAVEL_API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+const LARAVEL_API = getPublicApiUrl();
 
 async function consumeImage3dSlot(authHeader: string) {
   const res = await fetch(`${LARAVEL_API.replace(/\/$/, "")}/usage/consume`, {

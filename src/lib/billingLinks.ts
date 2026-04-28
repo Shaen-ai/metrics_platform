@@ -16,5 +16,5 @@ export function getBillingPortalUrl(): string {
 
 export function getSubscriptionSupportEmail(): string {
   if (typeof process === "undefined") return "";
-  return process.env.NEXT_PUBLIC_SUBSCRIPTION_SUPPORT_EMAIL?.trim() || "";
+  return process.env.NEXT_PUBLIC_SUBSCRIPTION_SUPPORT_EMAIL?.trim() || "support@tunzone.com";
 }

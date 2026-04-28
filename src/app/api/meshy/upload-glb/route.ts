@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getPublicApiUrl } from "@/lib/publicEnv";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+
+const API_URL = getPublicApiUrl();
 
 export async function POST(request: NextRequest) {
   try {

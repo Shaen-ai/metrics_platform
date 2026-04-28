@@ -5,7 +5,14 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useStore, useHydration } from "@/lib/store";
 import { Button, Input, Card, CardHeader, CardTitle, CardContent } from "@/components/ui";
-import { getTranslation, LanguageCode, languages } from "@/lib/translations";
+import {
+  getTranslation,
+  LanguageCode,
+  languages,
+  localizeAuthApiError,
+} from "@/lib/translations";
+import { getLandingUrl } from "@/lib/landingUrl";
+import Image from "next/image";
 
 function LoginForm() {
   const router = useRouter();
@@ -60,7 +67,8 @@ function LoginForm() {
 
     const result = await login({ email, password });
     if (!result.success) {
-      setError(result.error || "Login failed");
+      const raw = result.error || "Login failed";
+      setError(localizeAuthApiError(lang, raw));
     }
     setIsLoading(false);
   };
@@ -68,11 +76,21 @@ function LoginForm() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#FFF8F0] p-4">
       <Card className="w-full max-w-md rounded-2xl border-[#F0E6D8] shadow-sm">
-        <CardHeader className="text-center">
-          {/* Logo Badge */}
-          <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-[#E8772E] flex items-center justify-center shadow-sm">
-            <span className="text-white font-bold text-2xl">T</span>
-          </div>
+        <CardHeader className="items-center text-center">
+          <Link
+            href={getLandingUrl()}
+            className="relative mb-4 h-[200px] w-[min(100%,220px)] shrink-0 rounded-md outline-offset-4 transition-opacity hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#E8772E]"
+            aria-label={t("auth.logoHomeAria")}
+          >
+            <Image
+              src="/tunzone-logo.png"
+              alt=""
+              fill
+              className="object-contain object-center"
+              sizes="220px"
+              priority
+            />
+          </Link>
           {/* Language Selector */}
           <div className="flex justify-center gap-2 mb-4">
             {languages.map((l) => (
@@ -104,7 +122,6 @@ function LoginForm() {
             <Input
               label={t("auth.email")}
               type="email"
-              placeholder="demo@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -141,16 +158,6 @@ function LoginForm() {
               <Link href="/signup" className="text-[#E8772E] hover:underline font-medium">
                 {t("auth.signup")}
               </Link>
-            </p>
-          </div>
-
-          <div className="mt-4 p-3 bg-[#FEF3E7] rounded-xl text-sm">
-            <p className="font-medium mb-1 text-[#1A1A1A]">{t("auth.demoCredentials")}:</p>
-            <p className="text-[#6B7280]">
-              {t("auth.email")}: demo@example.com
-            </p>
-            <p className="text-[#6B7280]">
-              {t("auth.password")}: demo123
             </p>
           </div>
         </CardContent>
