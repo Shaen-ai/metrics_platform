@@ -21,6 +21,7 @@ import {
   isLikelyUploadSizeLimitMessage,
   isMaxUploadError,
 } from "@/lib/uploadLimits";
+import { parseCommaCategoryTags } from "@/lib/catalogCategoryTags";
 import Model3DGenerator from "@/components/Model3DGenerator";
 
 export default function EditCatalogItemPage() {
@@ -34,6 +35,7 @@ export default function EditCatalogItemPage() {
     model: "",
     description: "",
     category: "",
+    additionalCategories: "",
     price: "",
     currency: "AMD",
     deliveryDays: "",
@@ -66,6 +68,7 @@ export default function EditCatalogItemPage() {
         model: item.model || "",
         description: item.description,
         category: item.category,
+        additionalCategories: (item.additionalCategories ?? []).join(", "),
         price: item.price.toString(),
         currency: item.currency,
         deliveryDays: item.deliveryDays.toString(),
@@ -152,6 +155,7 @@ export default function EditCatalogItemPage() {
       model: formData.model || undefined,
       description: formData.description,
       category: formData.category,
+      additionalCategories: parseCommaCategoryTags(formData.additionalCategories),
       price: parseFloat(formData.price) || 0,
       currency: formData.currency,
       deliveryDays: parseInt(formData.deliveryDays) || 7,
@@ -232,6 +236,23 @@ export default function EditCatalogItemPage() {
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1.5">
+                {t("catalog.additionalCategories")}
+              </label>
+              <textarea
+                name="additionalCategories"
+                value={formData.additionalCategories}
+                onChange={handleChange}
+                rows={2}
+                placeholder="kitchen, outdoor, living-room"
+                className="w-full px-3 py-2 rounded-lg border border-[var(--input)] bg-[var(--background)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] text-sm"
+              />
+              <p className="text-xs text-[var(--muted-foreground)] mt-1.5">
+                {t("catalog.additionalCategoriesHint")}
+              </p>
             </div>
 
             <div className="grid grid-cols-2 gap-4">

@@ -323,7 +323,7 @@ export const useStore = create<AppState>()(
 
       fetchModes: async () => {
         const res = await api.getModes();
-        set({ modes: res.data as Mode[] });
+        set({ modes: normalizeListResponse<Mode>(res) });
       },
 
       getModeById: (modeId) => get().modes.find((m) => m.id === modeId),
@@ -368,6 +368,12 @@ export const useStore = create<AppState>()(
         if (item.modelUrl) payload.model_url = item.modelUrl;
         if (item.modelStatus) payload.model_status = item.modelStatus;
         if (item.modelJobId) payload.model_job_id = item.modelJobId;
+        if (item.additionalCategories !== undefined) {
+          const ac = item.additionalCategories
+            .filter((s) => typeof s === "string" && s.trim() !== "")
+            .map((s) => s.trim());
+          if (ac.length > 0) payload.additional_categories = ac;
+        }
         const res = await api.createCatalogItem(payload);
         const newItem = res.data as CatalogItem;
         set((s) => ({ catalogItems: [newItem, ...s.catalogItems] }));
@@ -391,6 +397,11 @@ export const useStore = create<AppState>()(
         if (updates.currency !== undefined) payload.currency = updates.currency;
         if (updates.deliveryDays !== undefined) payload.delivery_days = updates.deliveryDays;
         if (updates.category !== undefined) payload.category = updates.category;
+        if (updates.additionalCategories !== undefined) {
+          payload.additional_categories = updates.additionalCategories
+            .filter((s) => typeof s === "string" && s.trim() !== "")
+            .map((s) => s.trim());
+        }
         if (updates.isActive !== undefined) payload.is_active = updates.isActive;
         if (updates.images !== undefined) payload.images = updates.images;
         if (updates.availableColors !== undefined) {

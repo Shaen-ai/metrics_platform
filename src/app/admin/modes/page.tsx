@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useStore } from "@/lib/store";
 import { useTranslation } from "@/hooks/useTranslation";
-import { Card, CardContent } from "@/components/ui";
+import { Button, Card, CardContent } from "@/components/ui";
 import { ModeIcon } from "@/components/icons/ModeIcons";
 import { ArrowRight } from "lucide-react";
 
@@ -12,8 +12,14 @@ export default function ModesPage() {
   const router = useRouter();
   const { t } = useTranslation();
   const { modes, fetchModes } = useStore();
+  const [loadState, setLoadState] = useState<"loading" | "ok" | "error">("loading");
 
-  useEffect(() => { fetchModes().catch(() => {}); }, []);
+  useEffect(() => {
+    setLoadState("loading");
+    fetchModes()
+      .then(() => setLoadState("ok"))
+      .catch(() => setLoadState("error"));
+  }, []);
 
   const getModeTranslation = (slug: string) => {
     const translations: Record<string, { name: string; desc: string }> = {
@@ -32,8 +38,35 @@ export default function ModesPage() {
           <p className="text-[var(--muted-foreground)]">{t("modes.chooseType")}</p>
         </div>
 
+        {loadState === "loading" && (
+          <div className="flex justify-center py-16">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[var(--primary)]" />
+          </div>
+        )}
+
+        {loadState === "error" && (
+          <div className="text-center py-8 space-y-4">
+            <p className="text-[var(--muted-foreground)]">{t("modes.loadFailed")}</p>
+            <Button
+              type="button"
+              onClick={() => {
+                setLoadState("loading");
+                fetchModes()
+                  .then(() => setLoadState("ok"))
+                  .catch(() => setLoadState("error"));
+              }}
+            >
+              {t("modes.retry")}
+            </Button>
+          </div>
+        )}
+
+        {loadState === "ok" && modes.length === 0 && (
+          <p className="text-center text-[var(--muted-foreground)] py-8">{t("modes.noneAvailable")}</p>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {modes.map((mode) => {
+          {loadState === "ok" && modes.map((mode) => {
             const modeText = getModeTranslation(mode.slug);
             return (
               <Card
@@ -51,7 +84,7 @@ export default function ModesPage() {
                   </p>
                   <div className="flex items-center justify-center gap-2 text-sm text-[var(--primary)]">
                     <span>
-                      {mode.subModes.length} {t("modes.subCategories")}
+                      {(mode.subModes?.length ?? 0)} {t("modes.subCategories")}
                     </span>
                     <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                   </div>
@@ -64,3 +97,4 @@ export default function ModesPage() {
     </div>
   );
 }
+

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -9,6 +9,10 @@ import { Card, Button } from "@/components/ui";
 import { ArrowLeft, Package, ShoppingCart, X, Plus, Minus } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
 import { CatalogItem, User } from "@/lib/types";
+import {
+  catalogItemAllCategoryLabels,
+  catalogItemMatchesCategoryFilter,
+} from "@/lib/catalogItemCategories";
 
 interface CartItem {
   item: CatalogItem;
@@ -29,6 +33,35 @@ export default function PublicCatalogPage() {
   const [selectedColor, setSelectedColor] = useState<{ name: string; hex: string } | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [showCart, setShowCart] = useState(false);
+
+  const categories = useMemo(() => {
+    const displayAndCount = new Map<string, { label: string; count: number }>();
+    for (const item of catalogItems) {
+      for (const label of catalogItemAllCategoryLabels(item)) {
+        const slug = label.toLowerCase();
+        const cur = displayAndCount.get(slug);
+        if (!cur) {
+          displayAndCount.set(slug, { label, count: 1 });
+        } else {
+          displayAndCount.set(slug, { label: cur.label, count: cur.count + 1 });
+        }
+      }
+    }
+    const rows = [...displayAndCount.entries()]
+      .map(([slug, { label, count }]) => ({ slug, label, count }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+    return [
+      { slug: "all" as const, label: "", count: catalogItems.length },
+      ...rows,
+    ];
+  }, [catalogItems]);
+
+  const filteredItems = useMemo(() => {
+    if (selectedCategory === "all") return catalogItems;
+    return catalogItems.filter((item) =>
+      catalogItemMatchesCategoryFilter(item, selectedCategory),
+    );
+  }, [catalogItems, selectedCategory]);
 
   useEffect(() => {
     let cancelled = false;
@@ -59,11 +92,6 @@ export default function PublicCatalogPage() {
       </div>
     );
   }
-  const categories = ["all", ...new Set(catalogItems.map((item) => item.category))];
-  
-  const filteredItems = selectedCategory === "all"
-    ? catalogItems
-    : catalogItems.filter((item) => item.category === selectedCategory);
 
   const selectedItemData = catalogItems.find((item) => item.id === selectedItem);
 
@@ -140,15 +168,15 @@ export default function PublicCatalogPage() {
         <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
           {categories.map((cat) => (
             <button
-              key={cat}
-              onClick={() => setSelectedCategory(cat)}
+              key={cat.slug}
+              onClick={() => setSelectedCategory(cat.slug)}
               className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
-                selectedCategory === cat
+                selectedCategory === cat.slug
                   ? "bg-[var(--primary)] text-white"
                   : "bg-[var(--background)] hover:bg-[var(--secondary)]"
               }`}
             >
-              {cat === "all" ? "All Items" : cat}
+              {cat.slug === "all" ? "All Items" : cat.label}
             </button>
           ))}
         </div>

@@ -30,6 +30,7 @@ import {
   isLikelyUploadSizeLimitMessage,
   isMaxUploadError,
 } from "@/lib/uploadLimits";
+import { parseCommaCategoryTags } from "@/lib/catalogCategoryTags";
 
 export default function NewCatalogItemPage() {
   const router = useRouter();
@@ -41,6 +42,7 @@ export default function NewCatalogItemPage() {
     model: "",
     description: "",
     category: "",
+    additionalCategories: "",
     price: "",
     currency: currentUser?.currency || "AMD",
     deliveryDays: "",
@@ -263,11 +265,14 @@ export default function NewCatalogItemPage() {
         modelStatus = "done";
       }
 
+      const extraTags = parseCommaCategoryTags(formData.additionalCategories);
+
       const newItem = await addCatalogItem({
         name: formData.name,
         model: formData.model || undefined,
         description: formData.description,
         category: formData.category,
+        additionalCategories: extraTags.length > 0 ? extraTags : undefined,
         price: parseFloat(formData.price) || 0,
         currency: formData.currency,
         deliveryDays: parseInt(formData.deliveryDays) || 7,
@@ -380,6 +385,23 @@ export default function NewCatalogItemPage() {
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1.5">
+                {t("catalog.additionalCategories")}
+              </label>
+              <textarea
+                name="additionalCategories"
+                value={formData.additionalCategories}
+                onChange={handleChange}
+                rows={2}
+                placeholder="kitchen, outdoor, living-room"
+                className="w-full px-3 py-2 rounded-lg border border-[var(--input)] bg-[var(--background)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] text-sm"
+              />
+              <p className="text-xs text-[var(--muted-foreground)] mt-1.5">
+                {t("catalog.additionalCategoriesHint")}
+              </p>
             </div>
 
             <div className="grid grid-cols-2 gap-4">

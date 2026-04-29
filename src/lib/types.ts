@@ -5,6 +5,7 @@ export interface PlanEntitlementsSnapshot {
   planTier: string;
   trialEndsAt?: string | null;
   onTrial: boolean;
+  subscriptionActive?: boolean;
   aiChatMonthlyLimit: number | null;
   aiChatRemaining: number | null;
   image3dMonthlyLimit: number;
@@ -104,6 +105,10 @@ export interface CatalogItem {
   currency: string;
   deliveryDays: number;
   category: string;
+  /** Extra browse / room labels (combined with primary `category`). */
+  additionalCategories?: string[];
+  /** Merged deduped labels (API convenience). */
+  allCategories?: string[];
   availableColors?: Array<{ name: string; hex: string }>;
   modelUrl?: string;
   modelJobId?: string;

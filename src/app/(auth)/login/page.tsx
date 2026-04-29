@@ -98,7 +98,7 @@ function LoginForm() {
             aria-label={t("auth.logoHomeAria")}
           >
             <Image
-              src="/tunzone-logo.png"
+              src="/logo.png"
               alt=""
               fill
               className="object-contain object-center"
