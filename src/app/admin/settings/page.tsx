@@ -1,10 +1,27 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, Suspense } from "react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import type { LucideIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useStore } from "@/lib/store";
 import { Card, CardHeader, CardTitle, CardContent, Button, Input } from "@/components/ui";
-import { Copy, Check, ExternalLink, Globe, CreditCard, Layers, LayoutGrid, Crown, Palette, Upload, Loader2 } from "lucide-react";
+import {
+  Copy,
+  Check,
+  ExternalLink,
+  Globe,
+  Store,
+  CreditCard,
+  Layers,
+  LayoutGrid,
+  Crown,
+  Palette,
+  Upload,
+  Loader2,
+  UserRound,
+} from "lucide-react";
 import { languages, normalizeLanguageCode } from "@/lib/translations";
 import { currencies } from "@/lib/constants";
 import { useTranslation } from "@/hooks/useTranslation";
@@ -17,19 +34,57 @@ import { DEFAULT_PUBLIC_SITE_LAYOUT, publicSiteLayouts, publicSiteTextFields } f
 import type { PublicSiteTexts } from "@/lib/types";
 import { api } from "@/lib/api";
 import { uploadErrorUserMessage } from "@/lib/uploadLimits";
+import { buildPublishedStorefrontUrl, getStorefrontRootDomain } from "@/lib/storefrontUrl";
+import { getLandingUrl } from "@/lib/landingUrl";
+
+const SUBDOMAIN_REGEX = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/;
+
+function normalizeSubdomainInput(input: string): string {
+  return input
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 63);
+}
+
+const SETTINGS_TABS = ["storefront", "billing", "account", "appearance", "planners"] as const;
+export type SettingsTab = (typeof SETTINGS_TABS)[number];
+
+function parseSettingsTab(searchParams: URLSearchParams): SettingsTab {
+  const v = searchParams.get("tab");
+  if (v && (SETTINGS_TABS as readonly string[]).includes(v)) {
+    return v as SettingsTab;
+  }
+  return "storefront";
+}
 
 export default function SettingsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="max-w-2xl mx-auto p-10 flex justify-center items-center min-h-[40vh]">
+          <Loader2 className="w-8 h-8 animate-spin text-[#E8772E]" aria-hidden />
+        </div>
+      }
+    >
+      <SettingsPageContent />
+    </Suspense>
+  );
+}
+
+function SettingsPageContent() {
   const { t } = useTranslation();
   const {
     currentUser,
     updateUser,
+    publishSite,
     refreshProfile,
     getModeById,
     getSubModesByIds,
     fetchMaterials,
     materials,
   } = useStore();
-  const [copied, setCopied] = useState(false);
   const [formData, setFormData] = useState({
     name: currentUser?.name || "",
     companyName: currentUser?.companyName || "",
@@ -62,14 +117,34 @@ export default function SettingsPage() {
   const [catalogModeSaving, setCatalogModeSaving] = useState(false);
   const [catalogModeSaved, setCatalogModeSaved] = useState(false);
 
-  const [origin, setOrigin] = useState("");
-  useEffect(() => {
-    setOrigin(window.location.origin);
-  }, []);
+  const [subdomainDraft, setSubdomainDraft] = useState("");
+  const [subdomainAvail, setSubdomainAvail] = useState<"idle" | "checking" | "yes" | "no">("idle");
+  const [copiedPublished, setCopiedPublished] = useState(false);
+  const [publishBusy, setPublishBusy] = useState(false);
+  const [publishError, setPublishError] = useState<string | null>(null);
+  const [subdomainSaveBusy, setSubdomainSaveBusy] = useState(false);
+  const [subdomainSaveError, setSubdomainSaveError] = useState<string | null>(null);
+
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const activeTab = parseSettingsTab(searchParams);
+
+  const selectTab = (tab: SettingsTab) => {
+    const p = new URLSearchParams(searchParams.toString());
+    p.set("tab", tab);
+    router.replace(`${pathname}?${p.toString()}`, { scroll: false });
+  };
 
   useEffect(() => {
     fetchMaterials().catch(() => {});
   }, [fetchMaterials]);
+
+  useEffect(() => {
+    if (currentUser?.slug) {
+      setSubdomainDraft(currentUser.slug);
+    }
+  }, [currentUser?.slug]);
 
   useEffect(() => {
     void refreshProfile();
@@ -103,6 +178,24 @@ export default function SettingsPage() {
     });
   }, [plannerRestrict, sortedMaterials]);
 
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    const n = normalizeSubdomainInput(subdomainDraft);
+    const formatOk = n.length > 0 && SUBDOMAIN_REGEX.test(n);
+    if (!formatOk) {
+      setSubdomainAvail("idle");
+      return;
+    }
+    const h = setTimeout(() => {
+      setSubdomainAvail("checking");
+      api
+        .checkSubdomainAvailability(n)
+        .then(({ available }) => setSubdomainAvail(available ? "yes" : "no"))
+        .catch(() => setSubdomainAvail("idle"));
+    }, 400);
+    return () => clearTimeout(h);
+  }, [subdomainDraft, currentUser?.id]);
+
   if (!currentUser) return null;
 
   const ent = currentUser.entitlements;
@@ -113,6 +206,7 @@ export default function SettingsPage() {
     planLabel = planTier ? `${t("settings.plan.unknown")} (${planTier})` : t("settings.plan.tier.free");
   }
   const pricingUrl = getPricingPageUrl();
+  const effectivePricingUrl = (pricingUrl || `${getLandingUrl()}/pricing`).trim();
   const billingPortalUrl = getBillingPortalUrl();
   const supportEmail = getSubscriptionSupportEmail();
   const onTrial = ent?.onTrial === true;
@@ -134,12 +228,69 @@ export default function SettingsPage() {
       ? getSubModesByIds(currentUser.selectedModeId, currentUser.selectedSubModeIds)
       : [];
 
-  const publicUrl = `${origin}/${currentUser.slug}`;
+  const isSitePublished = Boolean(currentUser.sitePublishedAt);
+  const storefrontRoot = getStorefrontRootDomain();
+  const normalizedSubdomain = normalizeSubdomainInput(subdomainDraft);
+  const subdomainFormatOk =
+    normalizedSubdomain.length > 0 && SUBDOMAIN_REGEX.test(normalizedSubdomain);
+  const canSubscribePublish = currentUser.entitlements?.subscriptionActive === true;
+  const subdomainOkToProceed =
+    subdomainFormatOk &&
+    subdomainAvail !== "checking" &&
+    subdomainAvail !== "no" &&
+    (subdomainAvail === "yes" || normalizedSubdomain === currentUser.slug);
 
-  const handleCopyUrl = () => {
-    navigator.clipboard.writeText(publicUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const publishedStoreUrl = buildPublishedStorefrontUrl(currentUser.slug);
+
+  const handleCopyPublishedUrl = () => {
+    navigator.clipboard.writeText(publishedStoreUrl);
+    setCopiedPublished(true);
+    setTimeout(() => setCopiedPublished(false), 2000);
+  };
+
+  const handlePublishSite = async () => {
+    setPublishError(null);
+    if (!subdomainFormatOk) {
+      setPublishError(t("settings.subdomainInvalid"));
+      return;
+    }
+    if (subdomainAvail === "no") {
+      setPublishError(t("settings.subdomainUnavailable"));
+      return;
+    }
+    setPublishBusy(true);
+    try {
+      const body: { slug?: string } = {};
+      if (normalizedSubdomain !== currentUser.slug) {
+        body.slug = normalizedSubdomain;
+      }
+      await publishSite(Object.keys(body).length ? body : undefined);
+    } catch (e) {
+      setPublishError(e instanceof Error ? e.message : t("settings.publishError"));
+    } finally {
+      setPublishBusy(false);
+    }
+  };
+
+  const handleSaveSubdomain = async () => {
+    setSubdomainSaveError(null);
+    if (!subdomainFormatOk) {
+      setSubdomainSaveError(t("settings.subdomainInvalid"));
+      return;
+    }
+    if (subdomainAvail === "no") {
+      setSubdomainSaveError(t("settings.subdomainUnavailable"));
+      return;
+    }
+    if (normalizedSubdomain === currentUser.slug) return;
+    setSubdomainSaveBusy(true);
+    try {
+      await updateUser({ slug: normalizedSubdomain });
+    } catch (e) {
+      setSubdomainSaveError(e instanceof Error ? e.message : t("settings.publishError"));
+    } finally {
+      setSubdomainSaveBusy(false);
+    }
   };
 
   const handleSave = async () => {
@@ -196,16 +347,192 @@ export default function SettingsPage() {
     }
   };
 
+  const tabItems: { id: SettingsTab; label: string; icon: LucideIcon }[] = [
+    { id: "storefront", label: t("settings.tabs.storefront"), icon: Store },
+    { id: "billing", label: t("settings.tabs.billing"), icon: Crown },
+    { id: "account", label: t("settings.tabs.account"), icon: UserRound },
+    { id: "appearance", label: t("settings.tabs.appearance"), icon: Palette },
+    { id: "planners", label: t("settings.tabs.planners"), icon: Layers },
+  ];
+
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="max-w-2xl mx-auto space-y-5">
       <div>
-        <h1 className="text-2xl font-bold">{t("settings.title")}</h1>
-        <p className="text-[var(--muted-foreground)]">
-          {t("settings.description")}
-        </p>
+        <h1 className="text-2xl font-bold text-[#1A1A1A]">{t("settings.title")}</h1>
+        <p className="text-sm text-[#6B7280] mt-1">{t("settings.description")}</p>
       </div>
 
-      {/* Plan & billing */}
+      <nav
+        className="sticky top-0 z-20 -mx-1 px-1 py-1 sm:static sm:py-0 bg-[#FFF8F0]/95 sm:bg-transparent backdrop-blur-sm sm:backdrop-blur-none"
+        aria-label={t("settings.tabsNavLabel")}
+      >
+        <div
+          className="flex gap-1 p-1.5 rounded-2xl bg-white border border-[#F0E6D8] shadow-sm overflow-x-auto overscroll-x-contain"
+          role="tablist"
+        >
+          {tabItems.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === id}
+              id={`settings-tab-${id}`}
+              onClick={() => selectTab(id)}
+              className={cn(
+                "shrink-0 flex items-center gap-2 rounded-xl px-3 sm:px-3.5 py-2.5 text-sm font-medium transition-colors whitespace-nowrap",
+                activeTab === id
+                  ? "bg-[#FEF3E7] text-[#E8772E] shadow-sm ring-1 ring-[#E8772E]/20"
+                  : "text-[#6B7280] hover:bg-[#FEF3E7]/50 hover:text-[#1A1A1A]",
+              )}
+            >
+              <Icon className="w-4 h-4 shrink-0 opacity-90" aria-hidden />
+              {label}
+            </button>
+          ))}
+        </div>
+      </nav>
+
+      <div
+        className="space-y-6 pt-1"
+        role="tabpanel"
+        aria-labelledby={`settings-tab-${activeTab}`}
+      >
+        {activeTab === "storefront" && (
+      <Card className="border-[var(--primary)]/25 shadow-sm ring-1 ring-[var(--primary)]/10">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Store className="w-5 h-5 text-[var(--primary)]" />
+            {t("settings.storefrontTitle")}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-[var(--muted-foreground)]">
+            {isSitePublished ? t("settings.storefrontDescPublished") : t("settings.storefrontDescUnpublished")}
+          </p>
+
+          {!canSubscribePublish && (
+            <div className="flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50/90 p-4 dark:border-amber-900/50 dark:bg-amber-950/40 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-amber-950 dark:text-amber-100">{t("settings.storefrontUpgradeBanner")}</p>
+              <Button variant="primary" className="shrink-0 font-semibold" asChild>
+                <a href={effectivePricingUrl} target="_blank" rel="noopener noreferrer">
+                  <Crown className="w-4 h-4 mr-2" aria-hidden />
+                  {t("settings.plan.viewPricing")}
+                </a>
+              </Button>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium mb-1.5" htmlFor="storefront-subdomain">
+              {t("settings.subdomainLabel")}
+            </label>
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <span className="text-[var(--muted-foreground)]">https://</span>
+              <input
+                id="storefront-subdomain"
+                type="text"
+                autoComplete="off"
+                spellCheck={false}
+                value={subdomainDraft}
+                onChange={(e) => setSubdomainDraft(e.target.value)}
+                className="flex-1 min-w-[8rem] rounded-lg border border-[var(--input)] bg-[var(--background)] px-3 py-2 text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                placeholder={t("settings.subdomainPlaceholder")}
+              />
+              <span className="text-[var(--muted-foreground)]">.{storefrontRoot}</span>
+            </div>
+            {!subdomainFormatOk && normalizedSubdomain.length > 0 && (
+              <p className="mt-1.5 text-xs text-amber-700">{t("settings.subdomainInvalid")}</p>
+            )}
+            {subdomainFormatOk && subdomainAvail === "checking" && (
+              <p className="mt-1.5 text-xs text-[var(--muted-foreground)]">{t("settings.subdomainChecking")}</p>
+            )}
+            {subdomainFormatOk && subdomainAvail === "yes" && (
+              <p className="mt-1.5 text-xs text-emerald-700">{t("settings.subdomainAvailable")}</p>
+            )}
+            {subdomainFormatOk && subdomainAvail === "no" && (
+              <p className="mt-1.5 text-xs text-red-600">{t("settings.subdomainUnavailable")}</p>
+            )}
+          </div>
+
+          {isSitePublished ? (
+            <>
+              <div className="rounded-lg border border-[var(--border)] bg-[var(--muted)]/40 p-3 space-y-2">
+                <p className="text-xs font-medium text-[var(--muted-foreground)]">{t("settings.publishedUrlTitle")}</p>
+                <div className="flex flex-wrap gap-2 items-center">
+                  <span className="text-sm font-medium break-all">{publishedStoreUrl}</span>
+                  <Button type="button" variant="outline" size="sm" onClick={handleCopyPublishedUrl}>
+                    {copiedPublished ? <Check className="w-4 h-4 mr-1" /> : <Copy className="w-4 h-4 mr-1" />}
+                    {copiedPublished ? t("settings.copied") : t("settings.copy")}
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" asChild>
+                    <a href={publishedStoreUrl} target="_blank" rel="noopener noreferrer">
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
+                  </Button>
+                </div>
+              </div>
+              {normalizedSubdomain !== currentUser.slug && subdomainFormatOk && (
+                <p className="text-xs text-amber-700">{t("settings.subdomainSaveHint")}</p>
+              )}
+              {subdomainSaveError && <p className="text-sm text-red-600">{subdomainSaveError}</p>}
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleSaveSubdomain}
+                isLoading={subdomainSaveBusy}
+                disabled={
+                  !subdomainOkToProceed ||
+                  normalizedSubdomain === currentUser.slug
+                }
+              >
+                {t("settings.saveSubdomain")}
+              </Button>
+            </>
+          ) : (
+            <>
+              {subdomainSaveError && <p className="text-sm text-red-600">{subdomainSaveError}</p>}
+              {publishError && <p className="text-sm text-red-600">{publishError}</p>}
+              {!subdomainOkToProceed && subdomainFormatOk && (
+                <p className="text-xs text-[var(--muted-foreground)]">{t("settings.publishWaitingHint")}</p>
+              )}
+              <div className="flex flex-wrap gap-2 items-center">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleSaveSubdomain}
+                  isLoading={subdomainSaveBusy}
+                  disabled={
+                    !subdomainOkToProceed ||
+                    normalizedSubdomain === currentUser.slug
+                  }
+                >
+                  {t("settings.saveSubdomain")}
+                </Button>
+                <Button
+                  type="button"
+                  variant="primary"
+                  className="font-semibold"
+                  onClick={handlePublishSite}
+                  isLoading={publishBusy}
+                  disabled={!canSubscribePublish || !subdomainOkToProceed}
+                  title={
+                    !canSubscribePublish
+                      ? t("settings.subscribeToPublish")
+                      : !subdomainOkToProceed
+                        ? t("settings.publishWaitingHint")
+                        : undefined
+                  }
+                >
+                  {t("settings.publishSite")}
+                </Button>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+        )}
+
+        {activeTab === "billing" && (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -253,14 +580,12 @@ export default function SettingsPage() {
           )}
 
           <div className="flex flex-wrap gap-2">
-            {pricingUrl && (
-              <Button variant="outline" asChild>
-                <a href={pricingUrl} target="_blank" rel="noopener noreferrer">
-                  <ExternalLink className="w-4 h-4 mr-1.5" />
-                  {t("settings.plan.viewPricing")}
-                </a>
-              </Button>
-            )}
+            <Button variant="outline" asChild>
+              <a href={effectivePricingUrl} target="_blank" rel="noopener noreferrer">
+                <ExternalLink className="w-4 h-4 mr-1.5" />
+                {t("settings.plan.viewPricing")}
+              </a>
+            </Button>
             {billingPortalUrl && (
               <Button asChild>
                 <a href={billingPortalUrl} target="_blank" rel="noopener noreferrer">
@@ -283,8 +608,10 @@ export default function SettingsPage() {
           )}
         </CardContent>
       </Card>
+        )}
 
-      {/* Language & Currency */}
+        {activeTab === "account" && (
+          <>
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -293,7 +620,7 @@ export default function SettingsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-4">
             {/* Language Selection */}
             <div>
               <label className="block text-sm font-medium mb-2">
@@ -349,298 +676,6 @@ export default function SettingsPage() {
               </div>
             </div>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Public Page URL */}
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("settings.publicPage")}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-[var(--muted-foreground)] mb-3">
-            {t("settings.publicPageDesc")}
-          </p>
-          <div className="flex gap-2">
-            <div className="flex-1 flex items-center px-3 bg-[var(--muted)] rounded-lg text-sm">
-              <span className="truncate">{publicUrl}</span>
-            </div>
-            <Button variant="outline" onClick={handleCopyUrl}>
-              {copied ? (
-                <Check className="w-4 h-4 mr-2" />
-              ) : (
-                <Copy className="w-4 h-4 mr-2" />
-              )}
-              {copied ? t("settings.copied") : t("settings.copy")}
-            </Button>
-            <Button variant="outline" asChild>
-              <a href={`/${currentUser.slug}`} target="_blank" rel="noopener noreferrer">
-                <ExternalLink className="w-4 h-4" />
-              </a>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Published Site */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Palette className="w-5 h-5" />
-            Published Site
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-5">
-          <div>
-            <p className="text-sm text-[var(--muted-foreground)]">
-              Customize the text and design customers see on your Tunzone published site.
-            </p>
-            {!canUsePublishedLayouts && (
-              <p className="mt-2 text-xs rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-800">
-                Layout selection is available on Business Pro and Enterprise. You can preview designs, but the default layout will remain active.
-              </p>
-            )}
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            {publicSiteLayouts.map((layout) => {
-              const selected = siteLayout === layout.id;
-              return (
-                <button
-                  key={layout.id}
-                  type="button"
-                  onClick={() => setSiteLayout(layout.id)}
-                  className={`text-left rounded-xl border p-3 transition-colors ${
-                    selected
-                      ? "border-[var(--primary)] bg-[var(--primary)]/5"
-                      : "border-[var(--border)] hover:border-[var(--primary)]/50"
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="font-medium text-sm">{layout.name}</span>
-                    {selected && <Check className="w-4 h-4 text-[var(--primary)]" />}
-                  </div>
-                  <div className="mt-3 flex gap-1.5">
-                    {layout.swatches.map((color) => (
-                      <span
-                        key={color}
-                        className="h-5 w-8 rounded-md border border-black/10"
-                        style={{ backgroundColor: color }}
-                      />
-                    ))}
-                  </div>
-                  <p className="mt-3 text-xs leading-relaxed text-[var(--muted-foreground)]">
-                    {layout.description}
-                  </p>
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="space-y-3">
-            <div>
-              <h3 className="text-sm font-semibold">Published site texts</h3>
-              <p className="text-xs text-[var(--muted-foreground)]">
-                Leave a field empty to use the Tunzone default copy.
-              </p>
-            </div>
-            {publicSiteTextFields.map((field) => (
-              <div key={field.key}>
-                <label className="block text-sm font-medium mb-1.5 text-[var(--foreground)]">
-                  {field.label}
-                </label>
-                <textarea
-                  className="min-h-20 w-full rounded-lg border border-[var(--input)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
-                  value={siteTexts[field.key] || ""}
-                  onChange={(e) =>
-                    setSiteTexts((prev) => ({
-                      ...prev,
-                      [field.key]: e.target.value,
-                    }))
-                  }
-                />
-              </div>
-            ))}
-          </div>
-
-          <div className="rounded-xl border border-[var(--border)] p-4">
-            <p className="text-sm font-medium">Bespoke paid design</p>
-            <p className="mt-1 text-sm text-[var(--muted-foreground)]">
-              {canUseBespokeDesign
-                ? currentUser.customDesignKey
-                  ? `Custom design active: ${currentUser.customDesignKey}`
-                  : "Enterprise accounts can have a fully custom design assigned by Tunzone."
-                : "Fully custom user-specific designs are available for Enterprise customers after Tunzone assigns a bespoke design."}
-            </p>
-          </div>
-
-          <Button onClick={handleSavePublicSite} isLoading={siteSaving}>
-            {siteSaved ? (
-              <>
-                <Check className="w-4 h-4 mr-2" />
-                Published site saved
-              </>
-            ) : (
-              "Save published site"
-            )}
-          </Button>
-        </CardContent>
-      </Card>
-
-      {/* Planner materials (public site) */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Layers className="w-5 h-5" />
-            {t("settings.plannerMaterials")}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm text-[var(--muted-foreground)]">{t("settings.plannerMaterialsDesc")}</p>
-          <p className="text-sm text-[var(--muted-foreground)]">{t("settings.plannerMaterialsHint")}</p>
-          <div className="space-y-3">
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input
-                type="radio"
-                name="planner-materials-mode"
-                className="mt-1"
-                checked={!plannerRestrict}
-                onChange={() => setPlannerRestrict(false)}
-              />
-              <span className="text-sm">{t("settings.plannerMaterialsAll")}</span>
-            </label>
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input
-                type="radio"
-                name="planner-materials-mode"
-                className="mt-1"
-                checked={plannerRestrict}
-                onChange={() => {
-                  setPlannerRestrict(true);
-                  setPlannerSelection((prev) => {
-                    if (prev.size > 0) return prev;
-                    return new Set(sortedMaterials.map((m) => m.id));
-                  });
-                }}
-              />
-              <span className="text-sm">{t("settings.plannerMaterialsPick")}</span>
-            </label>
-          </div>
-          {plannerRestrict && (
-            <div className="max-h-64 overflow-y-auto rounded-lg border border-[var(--border)] p-2 space-y-0.5">
-              {sortedMaterials.length === 0 ? (
-                <p className="text-sm text-[var(--muted-foreground)] px-2 py-3">
-                  {t("settings.plannerMaterialsEmpty")}
-                </p>
-              ) : (
-                sortedMaterials.map((m) => (
-                  <label
-                    key={m.id}
-                    className="flex items-center gap-2 text-sm py-1.5 px-2 rounded-md hover:bg-[var(--muted)]/40 cursor-pointer"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={plannerSelection.has(m.id)}
-                      onChange={(e) => {
-                        setPlannerSelection((prev) => {
-                          const next = new Set(prev);
-                          if (e.target.checked) next.add(m.id);
-                          else next.delete(m.id);
-                          return next;
-                        });
-                      }}
-                    />
-                    <span>{m.name}</span>
-                  </label>
-                ))
-              )}
-            </div>
-          )}
-          <Button
-            variant="outline"
-            disabled={plannerRestrict && plannerSelection.size === 0 && sortedMaterials.length > 0}
-            isLoading={plannerSaving}
-            onClick={async () => {
-              setPlannerSaving(true);
-              try {
-                await updateUser({
-                  plannerMaterialIds:
-                    plannerRestrict && plannerSelection.size > 0 ? Array.from(plannerSelection) : null,
-                });
-                setPlannerSaved(true);
-                setTimeout(() => setPlannerSaved(false), 2000);
-              } finally {
-                setPlannerSaving(false);
-              }
-            }}
-          >
-            {plannerSaved ? (
-              <>
-                <Check className="w-4 h-4 mr-2" />
-                {t("settings.plannerMaterialsSaved")}
-              </>
-            ) : (
-              t("settings.savePlannerMaterials")
-            )}
-          </Button>
-        </CardContent>
-      </Card>
-
-      {/* Public planner furniture catalog */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <LayoutGrid className="w-5 h-5" />
-            {t("settings.plannerFurniture")}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm text-[var(--muted-foreground)]">{t("settings.plannerFurnitureDesc")}</p>
-          <div className="space-y-3">
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input
-                type="radio"
-                name="planner-catalog-mode"
-                className="mt-1"
-                checked={!customCatalogOnly}
-                onChange={() => setCustomCatalogOnly(false)}
-              />
-              <span className="text-sm">{t("settings.plannerFurnitureDefault")}</span>
-            </label>
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input
-                type="radio"
-                name="planner-catalog-mode"
-                className="mt-1"
-                checked={customCatalogOnly}
-                onChange={() => setCustomCatalogOnly(true)}
-              />
-              <span className="text-sm">{t("settings.plannerFurnitureCustom")}</span>
-            </label>
-          </div>
-          <Button
-            variant="outline"
-            isLoading={catalogModeSaving}
-            onClick={async () => {
-              setCatalogModeSaving(true);
-              try {
-                await updateUser({ useCustomPlannerCatalog: customCatalogOnly });
-                setCatalogModeSaved(true);
-                setTimeout(() => setCatalogModeSaved(false), 2000);
-              } finally {
-                setCatalogModeSaving(false);
-              }
-            }}
-          >
-            {catalogModeSaved ? (
-              <>
-                <Check className="w-4 h-4 mr-2" />
-                {t("settings.plannerFurnitureSaved")}
-              </>
-            ) : (
-              t("settings.savePlannerFurniture")
-            )}
-          </Button>
         </CardContent>
       </Card>
 
@@ -807,10 +842,6 @@ export default function SettingsPage() {
               <span>{currentUser.email}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-[var(--muted-foreground)]">{t("settings.slug")}</span>
-              <span>{currentUser.slug}</span>
-            </div>
-            <div className="flex justify-between">
               <span className="text-[var(--muted-foreground)]">{t("settings.memberSince")}</span>
               <span>
                 {new Date(currentUser.createdAt).toLocaleDateString("en-US")}
@@ -819,6 +850,274 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+          </>
+        )}
+
+        {activeTab === "appearance" && (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Palette className="w-5 h-5" />
+            {t("settings.publishedSiteDesignTitle")}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <div>
+            <p className="text-sm text-[var(--muted-foreground)]">
+              {t("settings.publishedSiteDesignDesc")}
+            </p>
+            {!canUsePublishedLayouts && (
+              <p className="mt-2 text-xs rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-800">
+                {t("settings.publishedSiteLayoutUpsell")}
+              </p>
+            )}
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            {publicSiteLayouts.map((layout) => {
+              const selected = siteLayout === layout.id;
+              return (
+                <button
+                  key={layout.id}
+                  type="button"
+                  onClick={() => setSiteLayout(layout.id)}
+                  className={`text-left rounded-xl border p-3 transition-colors ${
+                    selected
+                      ? "border-[var(--primary)] bg-[var(--primary)]/5"
+                      : "border-[var(--border)] hover:border-[var(--primary)]/50"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="font-medium text-sm">{layout.name}</span>
+                    {selected && <Check className="w-4 h-4 text-[var(--primary)]" />}
+                  </div>
+                  <div className="mt-3 flex gap-1.5">
+                    {layout.swatches.map((color) => (
+                      <span
+                        key={color}
+                        className="h-5 w-8 rounded-md border border-black/10"
+                        style={{ backgroundColor: color }}
+                      />
+                    ))}
+                  </div>
+                  <p className="mt-3 text-xs leading-relaxed text-[var(--muted-foreground)]">
+                    {layout.description}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="space-y-3">
+            <div>
+              <h3 className="text-sm font-semibold">{t("settings.publishedSiteTextsTitle")}</h3>
+              <p className="text-xs text-[var(--muted-foreground)]">
+                {t("settings.publishedSiteTextsHint")}
+              </p>
+            </div>
+            {publicSiteTextFields.map((field) => (
+              <div key={field.key}>
+                <label className="block text-sm font-medium mb-1.5 text-[var(--foreground)]">
+                  {field.label}
+                </label>
+                <textarea
+                  className="min-h-20 w-full rounded-lg border border-[var(--input)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                  value={siteTexts[field.key] || ""}
+                  onChange={(e) =>
+                    setSiteTexts((prev) => ({
+                      ...prev,
+                      [field.key]: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+            ))}
+          </div>
+
+          <div className="rounded-xl border border-[var(--border)] p-4">
+            <p className="text-sm font-medium">{t("settings.bespokeDesignTitle")}</p>
+            <p className="mt-1 text-sm text-[var(--muted-foreground)]">
+              {canUseBespokeDesign
+                ? currentUser.customDesignKey
+                  ? t("settings.bespokeDesignActive").replace("{key}", currentUser.customDesignKey)
+                  : t("settings.bespokeDesignEnterpriseHint")
+                : t("settings.bespokeDesignUpsell")}
+            </p>
+          </div>
+
+          <Button onClick={handleSavePublicSite} isLoading={siteSaving}>
+            {siteSaved ? (
+              <>
+                <Check className="w-4 h-4 mr-2" />
+                {t("settings.publishedSiteSaved")}
+              </>
+            ) : (
+              t("settings.savePublishedSite")
+            )}
+          </Button>
+        </CardContent>
+      </Card>
+        )}
+
+        {activeTab === "planners" && (
+          <>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Layers className="w-5 h-5" />
+            {t("settings.plannerMaterials")}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-[var(--muted-foreground)]">{t("settings.plannerMaterialsDesc")}</p>
+          <p className="text-sm text-[var(--muted-foreground)]">{t("settings.plannerMaterialsHint")}</p>
+          <div className="space-y-3">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="radio"
+                name="planner-materials-mode"
+                className="mt-1"
+                checked={!plannerRestrict}
+                onChange={() => setPlannerRestrict(false)}
+              />
+              <span className="text-sm">{t("settings.plannerMaterialsAll")}</span>
+            </label>
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="radio"
+                name="planner-materials-mode"
+                className="mt-1"
+                checked={plannerRestrict}
+                onChange={() => {
+                  setPlannerRestrict(true);
+                  setPlannerSelection((prev) => {
+                    if (prev.size > 0) return prev;
+                    return new Set(sortedMaterials.map((m) => m.id));
+                  });
+                }}
+              />
+              <span className="text-sm">{t("settings.plannerMaterialsPick")}</span>
+            </label>
+          </div>
+          {plannerRestrict && (
+            <div className="max-h-64 overflow-y-auto rounded-lg border border-[var(--border)] p-2 space-y-0.5">
+              {sortedMaterials.length === 0 ? (
+                <p className="text-sm text-[var(--muted-foreground)] px-2 py-3">
+                  {t("settings.plannerMaterialsEmpty")}
+                </p>
+              ) : (
+                sortedMaterials.map((m) => (
+                  <label
+                    key={m.id}
+                    className="flex items-center gap-2 text-sm py-1.5 px-2 rounded-md hover:bg-[var(--muted)]/40 cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={plannerSelection.has(m.id)}
+                      onChange={(e) => {
+                        setPlannerSelection((prev) => {
+                          const next = new Set(prev);
+                          if (e.target.checked) next.add(m.id);
+                          else next.delete(m.id);
+                          return next;
+                        });
+                      }}
+                    />
+                    <span>{m.name}</span>
+                  </label>
+                ))
+              )}
+            </div>
+          )}
+          <Button
+            variant="outline"
+            disabled={plannerRestrict && plannerSelection.size === 0 && sortedMaterials.length > 0}
+            isLoading={plannerSaving}
+            onClick={async () => {
+              setPlannerSaving(true);
+              try {
+                await updateUser({
+                  plannerMaterialIds:
+                    plannerRestrict && plannerSelection.size > 0 ? Array.from(plannerSelection) : null,
+                });
+                setPlannerSaved(true);
+                setTimeout(() => setPlannerSaved(false), 2000);
+              } finally {
+                setPlannerSaving(false);
+              }
+            }}
+          >
+            {plannerSaved ? (
+              <>
+                <Check className="w-4 h-4 mr-2" />
+                {t("settings.plannerMaterialsSaved")}
+              </>
+            ) : (
+              t("settings.savePlannerMaterials")
+            )}
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <LayoutGrid className="w-5 h-5" />
+            {t("settings.plannerFurniture")}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-[var(--muted-foreground)]">{t("settings.plannerFurnitureDesc")}</p>
+          <div className="space-y-3">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="radio"
+                name="planner-catalog-mode"
+                className="mt-1"
+                checked={!customCatalogOnly}
+                onChange={() => setCustomCatalogOnly(false)}
+              />
+              <span className="text-sm">{t("settings.plannerFurnitureDefault")}</span>
+            </label>
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="radio"
+                name="planner-catalog-mode"
+                className="mt-1"
+                checked={customCatalogOnly}
+                onChange={() => setCustomCatalogOnly(true)}
+              />
+              <span className="text-sm">{t("settings.plannerFurnitureCustom")}</span>
+            </label>
+          </div>
+          <Button
+            variant="outline"
+            isLoading={catalogModeSaving}
+            onClick={async () => {
+              setCatalogModeSaving(true);
+              try {
+                await updateUser({ useCustomPlannerCatalog: customCatalogOnly });
+                setCatalogModeSaved(true);
+                setTimeout(() => setCatalogModeSaved(false), 2000);
+              } finally {
+                setCatalogModeSaving(false);
+              }
+            }}
+          >
+            {catalogModeSaved ? (
+              <>
+                <Check className="w-4 h-4 mr-2" />
+                {t("settings.plannerFurnitureSaved")}
+              </>
+            ) : (
+              t("settings.savePlannerFurniture")
+            )}
+          </Button>
+        </CardContent>
+      </Card>
+          </>
+        )}
+      </div>
     </div>
   );
 }

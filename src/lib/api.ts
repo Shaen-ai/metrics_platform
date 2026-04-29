@@ -152,6 +152,47 @@ class ApiClient {
     this.setToken(null);
   }
 
+  /**
+   * Authenticated Stripe Checkout session URL (GET /billing/checkout with Bearer).
+   * Laravel returns JSON `{ url }` when Accept: application/json.
+   */
+  async getStripeCheckoutUrl(tier: string, interval: "month" | "year"): Promise<{ url: string }> {
+    const params = new URLSearchParams({ tier, interval });
+    const headers: Record<string, string> = {
+      Accept: "application/json",
+    };
+    const bearer = this.getBearerToken();
+    if (!bearer) {
+      throw new Error("Not authenticated");
+    }
+    headers["Authorization"] = `Bearer ${bearer}`;
+
+    const res = await fetch(`${API_URL}/billing/checkout?${params}`, {
+      method: "GET",
+      headers,
+    });
+
+    let data: { url?: string; message?: string } = {};
+    try {
+      data = (await res.json()) as { url?: string; message?: string };
+    } catch {
+      // non-JSON body
+    }
+
+    if (!res.ok) {
+      throw new Error(
+        typeof data.message === "string" && data.message
+          ? data.message
+          : `Checkout failed: ${res.status}`,
+      );
+    }
+    if (!data.url) {
+      throw new Error("Checkout did not return a URL");
+    }
+
+    return { url: data.url };
+  }
+
   async getProfile() {
     return this.request<{ user: unknown }>("/auth/me");
   }
@@ -160,6 +201,19 @@ class ApiClient {
     return this.request<{ user: unknown }>("/auth/me", {
       method: "PUT",
       body: JSON.stringify(data),
+    });
+  }
+
+  async checkSubdomainAvailability(slug: string) {
+    return this.request<{ available: boolean }>(
+      `/auth/subdomain-availability?slug=${encodeURIComponent(slug)}`,
+    );
+  }
+
+  async publishSite(body?: { slug?: string }) {
+    return this.request<{ user: unknown }>("/auth/publish-site", {
+      method: "POST",
+      body: JSON.stringify(body ?? {}),
     });
   }
 

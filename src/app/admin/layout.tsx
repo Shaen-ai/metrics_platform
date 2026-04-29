@@ -16,12 +16,14 @@ import {
   Menu,
   X,
   ChevronDown,
-  Home,
   Globe,
+  Crown,
 } from "lucide-react";
 import { languages, normalizeLanguageCode } from "@/lib/translations";
 import { Button } from "@/components/ui";
 import { ModeIcon } from "@/components/icons/ModeIcons";
+import { getPricingPageUrl } from "@/lib/billingLinks";
+import { getLandingUrl } from "@/lib/landingUrl";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -94,13 +96,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const selectedMode = getModeById(currentUser.selectedModeId);
   const selectedSubModes = getSubModesByIds(currentUser.selectedModeId, currentUser.selectedSubModeIds);
 
+  const planTier =
+    currentUser.entitlements?.planTier ?? currentUser.planTier ?? "free";
+  const showSidebarUpgrade =
+    planTier !== "business_pro" && planTier !== "enterprise";
+  const upgradePricingUrl = (getPricingPageUrl() || `${getLandingUrl()}/pricing`).trim();
+
   const navItems = [
     { href: "/admin", icon: LayoutDashboard, label: t("nav.dashboard") },
     { href: "/admin/catalog", icon: Package, label: t("nav.catalog") },
     { href: "/admin/materials", icon: Layers, label: t("nav.materials") },
     { href: "/admin/modules", icon: Box, label: t("nav.modules") },
     { href: "/admin/orders", icon: ShoppingCart, label: t("nav.orders") },
-    { href: "/room", icon: Home, label: "Room Visualizer", external: true },
     { href: "/admin/settings", icon: Settings, label: t("nav.settings") },
   ];
 
@@ -161,7 +168,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </Link>
 
         {/* Navigation */}
-        <nav className="p-4 space-y-1">
+        <nav className={`p-4 space-y-1 ${showSidebarUpgrade ? "pb-44" : "pb-36"}`}>
           {navItems.map((item) => {
             const isActive = pathname === item.href;
             return (
@@ -182,8 +189,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           })}
         </nav>
 
-        {/* Language Switcher + Logout */}
+        {/* Upgrade CTA (above language — higher priority for revenue) */}
         <div className="absolute bottom-4 left-4 right-4 space-y-2">
+          {showSidebarUpgrade && (
+            <Button variant="primary" className="w-full font-semibold shadow-sm ring-1 ring-[#E8772E]/30" asChild>
+              <a href={upgradePricingUrl} target="_blank" rel="noopener noreferrer">
+                <Crown className="w-4 h-4 mr-2 shrink-0" aria-hidden />
+                {t("nav.upgradePlan")}
+              </a>
+            </Button>
+          )}
           <button
             onClick={() => {
               const currentLang = normalizeLanguageCode(currentUser?.language);

@@ -9,18 +9,7 @@ import { getTranslation, localizeAuthApiError } from "@/lib/translations";
 import { AUTH_PAGE_LANG } from "@/lib/authPageLang";
 import { getLandingUrl } from "@/lib/landingUrl";
 import Image from "next/image";
-
-function safeNextPath(raw: string | null): string | null {
-  if (!raw) return null;
-  try {
-    const decoded = decodeURIComponent(raw);
-    if (!decoded.startsWith("/") || decoded.startsWith("//")) return null;
-    if (decoded.includes("://")) return null;
-    return decoded;
-  } catch {
-    return null;
-  }
-}
+import { safeNextPath } from "@/lib/safeNextPath";
 
 function LoginForm() {
   const router = useRouter();
@@ -38,6 +27,12 @@ function LoginForm() {
   const verification = searchParams.get("verification");
   const passwordReset = searchParams.get("reset");
   const billingSuccess = searchParams.get("billing") === "success";
+
+  const nextParam = searchParams.get("next");
+  const signupHref =
+    typeof nextParam === "string" && nextParam !== ""
+      ? `/signup?next=${encodeURIComponent(nextParam)}`
+      : "/signup";
 
   const infoMessage =
     billingSuccess
@@ -154,7 +149,7 @@ function LoginForm() {
           <div className="mt-6 text-center text-sm">
             <p className="text-[#6B7280]">
               {t("auth.dontHaveAccount")}{" "}
-              <Link href="/signup" className="text-[#E8772E] hover:underline font-medium">
+              <Link href={signupHref} className="text-[#E8772E] hover:underline font-medium">
                 {t("auth.signup")}
               </Link>
             </p>

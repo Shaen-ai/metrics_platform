@@ -44,6 +44,8 @@ export interface User {
   name: string;
   companyName: string;
   slug: string;
+  /** Set when the workspace has gone live on the public storefront; null until first publish. */
+  sitePublishedAt?: string | null;
   selectedModeId: string | null;
   selectedSubModeIds: string[];
   logo?: string;

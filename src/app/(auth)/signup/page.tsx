@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useStore, useHydration } from "@/lib/store";
 import { Button, Input, Card, CardHeader, CardTitle, CardContent } from "@/components/ui";
@@ -9,10 +9,12 @@ import { getTranslation } from "@/lib/translations";
 import { AUTH_PAGE_LANG } from "@/lib/authPageLang";
 import { getLandingUrl } from "@/lib/landingUrl";
 import Image from "next/image";
+import { safeNextPath } from "@/lib/safeNextPath";
 
-export default function SignupPage() {
+function SignupForm() {
   const router = useRouter();
-  const { signup, isAuthenticated } = useStore();
+  const searchParams = useSearchParams();
+  const { signup, isAuthenticated, currentUser } = useStore();
   const hydrated = useHydration();
   const [formData, setFormData] = useState({
     name: "",
@@ -27,12 +29,28 @@ export default function SignupPage() {
 
   const t = (key: string) => getTranslation(AUTH_PAGE_LANG, key);
 
+  const nextParam = searchParams.get("next");
+  const loginHref =
+    typeof nextParam === "string" && nextParam !== ""
+      ? `/login?next=${encodeURIComponent(nextParam)}`
+      : "/login";
+
   useEffect(() => {
     if (!hydrated) return;
+
     if (isAuthenticated) {
-      router.push("/admin/modes");
+      const next = safeNextPath(searchParams.get("next"));
+      if (next) {
+        router.push(next);
+        return;
+      }
+      if (currentUser?.selectedModeId && currentUser?.selectedSubModeIds?.length) {
+        router.push("/admin");
+      } else {
+        router.push("/admin/modes");
+      }
     }
-  }, [hydrated, isAuthenticated, router]);
+  }, [hydrated, isAuthenticated, currentUser, router, searchParams]);
 
   if (!hydrated || isAuthenticated) {
     return null;
@@ -66,7 +84,7 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#FFF8F0] p-4">
+    <div className="flex min-h-screen items-center justify-center bg-[#FFF8F0] p-4">
       <Card className="w-full max-w-md rounded-2xl border-[#F0E6D8] shadow-sm">
         <CardHeader className="items-center text-center">
           <Link
@@ -84,19 +102,19 @@ export default function SignupPage() {
             />
           </Link>
           <CardTitle className="text-2xl text-[#1A1A1A]">{t("auth.createAccount")}</CardTitle>
-          <p className="text-[#6B7280] mt-2">
+          <p className="mt-2 text-[#6B7280]">
             {t("auth.startBuilding")}
           </p>
         </CardHeader>
         <CardContent>
           {emailSent ? (
             <div className="space-y-4 text-center">
-              <p className="text-sm text-[#1A1A1A] bg-[#E8F5E9] border border-[#C8E6C9] p-4 rounded-lg">
+              <p className="rounded-lg border border-[#C8E6C9] bg-[#E8F5E9] p-4 text-sm text-[#1A1A1A]">
                 {t("auth.signupCheckEmail")}
               </p>
               <Link
-                href="/login"
-                className="inline-block text-[#E8772E] font-medium hover:underline"
+                href={loginHref}
+                className="inline-block font-medium text-[#E8772E] hover:underline"
               >
                 {t("auth.backToSignIn")}
               </Link>
@@ -144,7 +162,7 @@ export default function SignupPage() {
               required
             />
             {error && (
-              <p className="text-sm text-red-500 bg-red-50 p-2 rounded">{error}</p>
+              <p className="rounded bg-red-50 p-2 text-sm text-red-500">{error}</p>
             )}
             <Button type="submit" className="w-full" isLoading={isLoading}>
               {isLoading ? t("auth.creatingAccount") : t("auth.signup")}
@@ -156,7 +174,7 @@ export default function SignupPage() {
           <div className="mt-6 text-center text-sm">
             <p className="text-[#6B7280]">
               {t("auth.alreadyHaveAccount")}{" "}
-              <Link href="/login" className="text-[#E8772E] hover:underline font-medium">
+              <Link href={loginHref} className="font-medium text-[#E8772E] hover:underline">
                 {t("auth.login")}
               </Link>
             </p>
@@ -165,5 +183,19 @@ export default function SignupPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-[#FFF8F0] p-4 text-[#6B7280]">
+          …
+        </div>
+      }
+    >
+      <SignupForm />
+    </Suspense>
   );
 }

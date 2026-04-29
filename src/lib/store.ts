@@ -132,6 +132,7 @@ interface AppState {
   }) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   updateUser: (updates: Partial<User>) => Promise<void>;
+  publishSite: (payload?: { slug?: string }) => Promise<void>;
   restoreSession: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 
@@ -296,6 +297,7 @@ export const useStore = create<AppState>()(
         const snakeCaseUpdates = updates as Partial<User> & { paypal_email?: string };
         if (updates.name !== undefined) payload.name = updates.name;
         if (updates.companyName !== undefined) payload.company_name = updates.companyName;
+        if (updates.slug !== undefined) payload.slug = updates.slug;
         if (updates.logo !== undefined) payload.logo = updates.logo;
         if (updates.language !== undefined) payload.language = updates.language;
         if (updates.currency !== undefined) payload.currency = updates.currency;
@@ -313,6 +315,11 @@ export const useStore = create<AppState>()(
         if (updates.customDesignKey !== undefined) payload.custom_design_key = updates.customDesignKey;
 
         const res = await api.updateProfile(payload);
+        set({ currentUser: normalizeUserFromApi(res.user as User) });
+      },
+
+      publishSite: async (payload) => {
+        const res = await api.publishSite(payload);
         set({ currentUser: normalizeUserFromApi(res.user as User) });
       },
 
