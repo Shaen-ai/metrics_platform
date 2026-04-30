@@ -2,9 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef, Suspense } from "react";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import type { LucideIcon } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { useSearchParams } from "next/navigation";
 import { useStore } from "@/lib/store";
 import { Card, CardHeader, CardTitle, CardContent, Button, Input } from "@/components/ui";
 import {
@@ -20,9 +18,9 @@ import {
   Palette,
   Upload,
   Loader2,
-  UserRound,
 } from "lucide-react";
 import { languages, normalizeLanguageCode } from "@/lib/translations";
+import { setStoredLanguagePreference } from "@/lib/languagePreference";
 import { currencies } from "@/lib/constants";
 import { useTranslation } from "@/hooks/useTranslation";
 import {
@@ -30,7 +28,13 @@ import {
   getPricingPageUrl,
   getSubscriptionSupportEmail,
 } from "@/lib/billingLinks";
-import { DEFAULT_PUBLIC_SITE_LAYOUT, publicSiteLayouts, publicSiteTextFields } from "@/lib/publicSite";
+import {
+  DEFAULT_PUBLIC_CATALOG_LAYOUT,
+  DEFAULT_PUBLIC_SITE_LAYOUT,
+  publicCatalogLayouts,
+  publicSiteLayouts,
+  publicSiteTextFields,
+} from "@/lib/publicSite";
 import type { PublicSiteTexts } from "@/lib/types";
 import { api } from "@/lib/api";
 import { uploadErrorUserMessage } from "@/lib/uploadLimits";
@@ -38,6 +42,7 @@ import { buildPublishedStorefrontUrl, getStorefrontRootDomain } from "@/lib/stor
 import { getLandingUrl } from "@/lib/landingUrl";
 
 const SUBDOMAIN_REGEX = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/;
+const ALL_PUBLIC_CATALOG_LAYOUT_IDS: string[] = publicCatalogLayouts.map((layout) => layout.id);
 
 function normalizeSubdomainInput(input: string): string {
   return input
@@ -80,8 +85,7 @@ function SettingsPageContent() {
     updateUser,
     publishSite,
     refreshProfile,
-    getModeById,
-    getSubModesByIds,
+    modes,
     fetchMaterials,
     materials,
   } = useStore();
@@ -102,6 +106,16 @@ function SettingsPageContent() {
   const [siteTexts, setSiteTexts] = useState<PublicSiteTexts>(currentUser?.publicSiteTexts || {});
   const [siteSaving, setSiteSaving] = useState(false);
   const [siteSaved, setSiteSaved] = useState(false);
+  const [siteSaveError, setSiteSaveError] = useState<string | null>(null);
+  const [catalogLayoutSelection, setCatalogLayoutSelection] = useState<Set<string>>(
+    () => new Set(currentUser?.publicCatalogLayouts?.length ? currentUser.publicCatalogLayouts : ALL_PUBLIC_CATALOG_LAYOUT_IDS),
+  );
+  const [catalogDefaultLayout, setCatalogDefaultLayout] = useState(
+    currentUser?.publicCatalogDefaultLayout || DEFAULT_PUBLIC_CATALOG_LAYOUT,
+  );
+  const [catalogLayoutSaving, setCatalogLayoutSaving] = useState(false);
+  const [catalogLayoutSaved, setCatalogLayoutSaved] = useState(false);
+  const [catalogLayoutError, setCatalogLayoutError] = useState<string | null>(null);
 
   const sortedMaterials = useMemo(
     () => [...materials].sort((a, b) => a.name.localeCompare(b.name)),
@@ -126,19 +140,7 @@ function SettingsPageContent() {
   const [subdomainSaveError, setSubdomainSaveError] = useState<string | null>(null);
 
   const searchParams = useSearchParams();
-  const router = useRouter();
-  const pathname = usePathname();
   const activeTab = parseSettingsTab(searchParams);
-
-  const selectTab = (tab: SettingsTab) => {
-    const p = new URLSearchParams(searchParams.toString());
-    p.set("tab", tab);
-    router.replace(`${pathname}?${p.toString()}`, { scroll: false });
-  };
-
-  useEffect(() => {
-    fetchMaterials().catch(() => {});
-  }, [fetchMaterials]);
 
   useEffect(() => {
     if (currentUser?.slug) {
@@ -171,6 +173,19 @@ function SettingsPageContent() {
   }, [currentUser?.publicSiteLayout, currentUser?.publicSiteTexts]);
 
   useEffect(() => {
+    const visibleLayouts = currentUser?.publicCatalogLayouts?.length
+      ? currentUser.publicCatalogLayouts
+      : ALL_PUBLIC_CATALOG_LAYOUT_IDS;
+    const nextSelection = new Set(visibleLayouts);
+    const nextDefault =
+      currentUser?.publicCatalogDefaultLayout && nextSelection.has(currentUser.publicCatalogDefaultLayout)
+        ? currentUser.publicCatalogDefaultLayout
+        : visibleLayouts[0] || DEFAULT_PUBLIC_CATALOG_LAYOUT;
+    setCatalogLayoutSelection(nextSelection);
+    setCatalogDefaultLayout(nextDefault);
+  }, [currentUser?.publicCatalogDefaultLayout, currentUser?.publicCatalogLayouts]);
+
+  useEffect(() => {
     if (!plannerRestrict || sortedMaterials.length === 0) return;
     setPlannerSelection((prev) => {
       if (prev.size > 0) return prev;
@@ -196,6 +211,13 @@ function SettingsPageContent() {
     return () => clearTimeout(h);
   }, [subdomainDraft, currentUser?.id]);
 
+  const hasActiveSubscription = currentUser?.entitlements?.subscriptionActive === true;
+
+  useEffect(() => {
+    if (activeTab !== "planners" || !hasActiveSubscription) return;
+    fetchMaterials().catch(() => {});
+  }, [activeTab, fetchMaterials, hasActiveSubscription]);
+
   if (!currentUser) return null;
 
   const ent = currentUser.entitlements;
@@ -217,16 +239,17 @@ function SettingsPageContent() {
       : null;
 
   const effectiveLanguage = normalizeLanguageCode(currentUser.language);
-  const canUsePublishedLayouts = currentUser.entitlements?.publishedLayouts === true;
+  const canUseBrandingAndCopy = currentUser.entitlements?.customTheme === true;
   const canUseBespokeDesign = currentUser.entitlements?.bespokeDesign === true;
 
-  const selectedMode = currentUser.selectedModeId
-    ? getModeById(currentUser.selectedModeId)
-    : null;
-  const selectedSubModes =
-    currentUser.selectedModeId && currentUser.selectedSubModeIds?.length
-      ? getSubModesByIds(currentUser.selectedModeId, currentUser.selectedSubModeIds)
-      : [];
+  const selectedSubModeIdSet = new Set(currentUser.selectedSubModeIds ?? []);
+  const selectedModes = modes.filter((mode) =>
+    mode.subModes.some((subMode) => selectedSubModeIdSet.has(subMode.id)),
+  );
+  const selectedSubModes = modes.flatMap((mode) =>
+    mode.subModes.filter((subMode) => selectedSubModeIdSet.has(subMode.id)),
+  );
+  const selectedModeNames = selectedModes.map((mode) => mode.name).join(", ");
 
   const isSitePublished = Boolean(currentUser.sitePublishedAt);
   const storefrontRoot = getStorefrontRootDomain();
@@ -326,6 +349,7 @@ function SettingsPageContent() {
   };
 
   const handleLanguageChange = (lang: string) => {
+    setStoredLanguagePreference(normalizeLanguageCode(lang));
     updateUser({ language: lang as "en" | "ru" }).catch(console.error);
   };
 
@@ -334,26 +358,59 @@ function SettingsPageContent() {
   };
 
   const handleSavePublicSite = async () => {
+    setSiteSaveError(null);
+    if (!canUseBrandingAndCopy) {
+      setSiteSaveError(t("settings.appearanceUpgradeRequired"));
+      return;
+    }
     setSiteSaving(true);
     try {
       await updateUser({
-        publicSiteLayout: canUsePublishedLayouts ? siteLayout : DEFAULT_PUBLIC_SITE_LAYOUT,
+        publicSiteLayout: siteLayout,
         publicSiteTexts: siteTexts,
       });
       setSiteSaved(true);
       setTimeout(() => setSiteSaved(false), 2000);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "";
+      setSiteSaveError(
+        /subscription|subscribed|active/i.test(message)
+          ? t("settings.appearanceUpgradeRequired")
+          : message || t("settings.appearanceSaveError"),
+      );
     } finally {
       setSiteSaving(false);
     }
   };
 
-  const tabItems: { id: SettingsTab; label: string; icon: LucideIcon }[] = [
-    { id: "storefront", label: t("settings.tabs.storefront"), icon: Store },
-    { id: "billing", label: t("settings.tabs.billing"), icon: Crown },
-    { id: "account", label: t("settings.tabs.account"), icon: UserRound },
-    { id: "appearance", label: t("settings.tabs.appearance"), icon: Palette },
-    { id: "planners", label: t("settings.tabs.planners"), icon: Layers },
-  ];
+  const handleSaveCatalogLayouts = async () => {
+    const selectedLayouts = ALL_PUBLIC_CATALOG_LAYOUT_IDS.filter((layoutId) =>
+      catalogLayoutSelection.has(layoutId),
+    );
+    if (selectedLayouts.length === 0) {
+      setCatalogLayoutError(t("settings.catalogLayoutsAtLeastOne"));
+      return;
+    }
+    const defaultLayout = selectedLayouts.includes(catalogDefaultLayout)
+      ? catalogDefaultLayout
+      : selectedLayouts[0];
+
+    setCatalogLayoutError(null);
+    setCatalogLayoutSaving(true);
+    try {
+      await updateUser({
+        publicCatalogLayouts: selectedLayouts,
+        publicCatalogDefaultLayout: defaultLayout,
+      });
+      setCatalogDefaultLayout(defaultLayout);
+      setCatalogLayoutSaved(true);
+      setTimeout(() => setCatalogLayoutSaved(false), 2000);
+    } catch (e) {
+      setCatalogLayoutError(e instanceof Error ? e.message : t("settings.catalogLayoutsSaveError"));
+    } finally {
+      setCatalogLayoutSaving(false);
+    }
+  };
 
   return (
     <div className="max-w-2xl mx-auto space-y-5">
@@ -362,40 +419,10 @@ function SettingsPageContent() {
         <p className="text-sm text-[#6B7280] mt-1">{t("settings.description")}</p>
       </div>
 
-      <nav
-        className="sticky top-0 z-20 -mx-1 px-1 py-1 sm:static sm:py-0 bg-[#FFF8F0]/95 sm:bg-transparent backdrop-blur-sm sm:backdrop-blur-none"
-        aria-label={t("settings.tabsNavLabel")}
-      >
-        <div
-          className="flex gap-1 p-1.5 rounded-2xl bg-white border border-[#F0E6D8] shadow-sm overflow-x-auto overscroll-x-contain"
-          role="tablist"
-        >
-          {tabItems.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              type="button"
-              role="tab"
-              aria-selected={activeTab === id}
-              id={`settings-tab-${id}`}
-              onClick={() => selectTab(id)}
-              className={cn(
-                "shrink-0 flex items-center gap-2 rounded-xl px-3 sm:px-3.5 py-2.5 text-sm font-medium transition-colors whitespace-nowrap",
-                activeTab === id
-                  ? "bg-[#FEF3E7] text-[#E8772E] shadow-sm ring-1 ring-[#E8772E]/20"
-                  : "text-[#6B7280] hover:bg-[#FEF3E7]/50 hover:text-[#1A1A1A]",
-              )}
-            >
-              <Icon className="w-4 h-4 shrink-0 opacity-90" aria-hidden />
-              {label}
-            </button>
-          ))}
-        </div>
-      </nav>
-
       <div
         className="space-y-6 pt-1"
         role="tabpanel"
-        aria-labelledby={`settings-tab-${activeTab}`}
+        aria-label={t(`settings.tabs.${activeTab}`)}
       >
         {activeTab === "storefront" && (
       <Card className="border-[var(--primary)]/25 shadow-sm ring-1 ring-[var(--primary)]/10">
@@ -687,10 +714,10 @@ function SettingsPageContent() {
         <CardContent>
           <div className="flex items-center justify-between">
             <div>
-              {selectedMode && selectedSubModes.length > 0 ? (
+              {selectedModes.length > 0 && selectedSubModes.length > 0 ? (
                 <>
                   <p className="font-medium">
-                    {selectedMode.name} → {selectedSubModes.map((sm) => sm.name).join(", ")}
+                    {selectedModeNames} → {selectedSubModes.map((sm) => sm.name).join(", ")}
                   </p>
                   <p className="text-sm text-[var(--muted-foreground)]">
                     {selectedSubModes.length} {selectedSubModes.length === 1 ? "category" : "categories"} selected
@@ -854,6 +881,7 @@ function SettingsPageContent() {
         )}
 
         {activeTab === "appearance" && (
+          <>
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -866,12 +894,30 @@ function SettingsPageContent() {
             <p className="text-sm text-[var(--muted-foreground)]">
               {t("settings.publishedSiteDesignDesc")}
             </p>
-            {!canUsePublishedLayouts && (
-              <p className="mt-2 text-xs rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-800">
-                {t("settings.publishedSiteLayoutUpsell")}
-              </p>
+            {!canUseBrandingAndCopy && (
+              <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-800">
+                <p className="text-xs">{t("settings.publishedSiteLayoutUpsell")}</p>
+                <Button variant="outline" size="sm" className="mt-3 bg-white" asChild>
+                  <a href={effectivePricingUrl} target="_blank" rel="noopener noreferrer">
+                    <Crown className="w-4 h-4 mr-2" />
+                    {t("settings.viewPlans")}
+                  </a>
+                </Button>
+              </div>
             )}
           </div>
+
+          {siteSaveError ? (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              <p>{siteSaveError}</p>
+              <Button variant="outline" size="sm" className="mt-3 bg-white" asChild>
+                <a href={effectivePricingUrl} target="_blank" rel="noopener noreferrer">
+                  <Crown className="w-4 h-4 mr-2" />
+                  {t("settings.viewPlans")}
+                </a>
+              </Button>
+            </div>
+          ) : null}
 
           <div className="grid gap-3 sm:grid-cols-2">
             {publicSiteLayouts.map((layout) => {
@@ -880,12 +926,15 @@ function SettingsPageContent() {
                 <button
                   key={layout.id}
                   type="button"
-                  onClick={() => setSiteLayout(layout.id)}
+                  disabled={!canUseBrandingAndCopy}
+                  onClick={() => {
+                    if (canUseBrandingAndCopy) setSiteLayout(layout.id);
+                  }}
                   className={`text-left rounded-xl border p-3 transition-colors ${
                     selected
                       ? "border-[var(--primary)] bg-[var(--primary)]/5"
                       : "border-[var(--border)] hover:border-[var(--primary)]/50"
-                  }`}
+                  } ${!canUseBrandingAndCopy ? "cursor-not-allowed opacity-60" : ""}`}
                 >
                   <div className="flex items-center justify-between gap-3">
                     <span className="font-medium text-sm">{layout.name}</span>
@@ -923,6 +972,7 @@ function SettingsPageContent() {
                 <textarea
                   className="min-h-20 w-full rounded-lg border border-[var(--input)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
                   value={siteTexts[field.key] || ""}
+                  disabled={!canUseBrandingAndCopy}
                   onChange={(e) =>
                     setSiteTexts((prev) => ({
                       ...prev,
@@ -957,10 +1007,117 @@ function SettingsPageContent() {
           </Button>
         </CardContent>
       </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <LayoutGrid className="w-5 h-5" />
+            {t("settings.catalogLayoutsTitle")}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-[var(--muted-foreground)]">{t("settings.catalogLayoutsDesc")}</p>
+          {catalogLayoutError ? (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              {catalogLayoutError}
+            </div>
+          ) : null}
+          <div className="rounded-xl border border-[var(--border)] divide-y divide-[var(--border)]">
+            {publicCatalogLayouts.map((layout) => {
+              const enabled = catalogLayoutSelection.has(layout.id);
+              const onlySelected = enabled && catalogLayoutSelection.size === 1;
+              return (
+                <div key={layout.id} className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
+                  <label className="flex items-center gap-3 text-sm font-medium cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={enabled}
+                      disabled={onlySelected}
+                      onChange={(e) => {
+                        setCatalogLayoutSelection((prev) => {
+                          const next = new Set(prev);
+                          if (e.target.checked) {
+                            next.add(layout.id);
+                          } else if (next.size > 1) {
+                            next.delete(layout.id);
+                          }
+                          if (!next.has(catalogDefaultLayout)) {
+                            setCatalogDefaultLayout([...next][0] || DEFAULT_PUBLIC_CATALOG_LAYOUT);
+                          }
+                          return next;
+                        });
+                      }}
+                    />
+                    <span>{layout.name}</span>
+                  </label>
+                  <label
+                    className={`flex items-center gap-2 text-xs ${
+                      enabled ? "cursor-pointer text-[var(--muted-foreground)]" : "cursor-not-allowed text-[var(--muted-foreground)]/60"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="catalog-default-layout"
+                      checked={catalogDefaultLayout === layout.id}
+                      disabled={!enabled}
+                      onChange={() => setCatalogDefaultLayout(layout.id)}
+                    />
+                    {t("settings.catalogLayoutsDefault")}
+                  </label>
+                </div>
+              );
+            })}
+          </div>
+          <Button onClick={handleSaveCatalogLayouts} isLoading={catalogLayoutSaving}>
+            {catalogLayoutSaved ? (
+              <>
+                <Check className="w-4 h-4 mr-2" />
+                {t("settings.catalogLayoutsSaved")}
+              </>
+            ) : (
+              t("settings.saveCatalogLayouts")
+            )}
+          </Button>
+        </CardContent>
+      </Card>
+          </>
         )}
 
         {activeTab === "planners" && (
           <>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Store className="w-5 h-5" />
+            {t("settings.currentMode")}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-[var(--muted-foreground)]">
+            {t("settings.businessCategoriesPlannerHint")}
+          </p>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              {selectedModes.length > 0 && selectedSubModes.length > 0 ? (
+                <>
+                  <p className="font-medium">
+                    {selectedModeNames} → {selectedSubModes.map((sm) => sm.name).join(", ")}
+                  </p>
+                  <p className="text-sm text-[var(--muted-foreground)]">
+                    {selectedSubModes.length}{" "}
+                    {selectedSubModes.length === 1 ? "category" : "categories"} selected
+                  </p>
+                </>
+              ) : (
+                <p className="text-[var(--muted-foreground)]">{t("settings.noModeSelected")}</p>
+              )}
+            </div>
+            <Button variant="outline" asChild className="shrink-0 w-full sm:w-auto">
+              <Link href="/admin/modes">{t("settings.changeMode")}</Link>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">

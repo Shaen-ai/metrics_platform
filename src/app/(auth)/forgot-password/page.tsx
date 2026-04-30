@@ -6,7 +6,8 @@ import Link from "next/link";
 import { useStore, useHydration } from "@/lib/store";
 import { Button, Input, Card, CardHeader, CardTitle, CardContent } from "@/components/ui";
 import { getTranslation } from "@/lib/translations";
-import { AUTH_PAGE_LANG } from "@/lib/authPageLang";
+import { useLanguagePreference } from "@/hooks/useLanguagePreference";
+import { LanguagePreferenceButton } from "@/components/LanguagePreferenceButton";
 import { getLandingUrl } from "@/lib/landingUrl";
 import Image from "next/image";
 
@@ -18,8 +19,9 @@ export default function ForgotPasswordPage() {
   const [error, setError] = useState("");
   const [sent, setSent] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const { lang } = useLanguagePreference();
 
-  const t = (key: string) => getTranslation(AUTH_PAGE_LANG, key);
+  const t = (key: string) => getTranslation(lang, key);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -46,7 +48,8 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#FFF8F0] p-4">
+    <div className="relative min-h-screen flex items-center justify-center bg-[#FFF8F0] p-4">
+      <LanguagePreferenceButton className="absolute right-4 top-4 flex items-center gap-2 rounded-xl border border-[#F0E6D8] bg-white px-3 py-2 text-sm text-[#6B7280] shadow-sm transition-colors hover:border-[#E8772E] hover:text-[#E8772E]" />
       <Card className="w-full max-w-md rounded-2xl border-[#F0E6D8] shadow-sm">
         <CardHeader className="items-center text-center">
           <Link

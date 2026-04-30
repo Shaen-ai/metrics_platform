@@ -5,7 +5,7 @@ import { getPublicApiUrl } from "@/lib/publicEnv";
 const MESHY_BASE_URL = "https://api.meshy.ai/openapi/v1";
 const LARAVEL_API = getPublicApiUrl();
 
-async function consumeImage3dSlot(authHeader: string) {
+async function consumeImage3dSlot(authHeader: string, consume: boolean) {
   const res = await fetch(`${LARAVEL_API.replace(/\/$/, "")}/usage/consume`, {
     method: "POST",
     headers: {
@@ -13,7 +13,7 @@ async function consumeImage3dSlot(authHeader: string) {
       Accept: "application/json",
       Authorization: authHeader,
     },
-    body: JSON.stringify({ feature: "image3d" }),
+    body: JSON.stringify({ feature: "image3d", consume }),
   });
   const data = (await res.json().catch(() => ({}))) as {
     message?: string;
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
   const apiKey = process.env.MESHY_API_KEY;
   if (!apiKey) {
     return NextResponse.json(
-      { error: "MESHY_API_KEY is not configured" },
+      { error: "Image-to-3D is not configured on this server. Add MESHY_API_KEY to the admin app environment." },
       { status: 500 },
     );
   }
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const quota = await consumeImage3dSlot(auth);
+    const quota = await consumeImage3dSlot(auth, false);
     if (!quota.ok) {
       return NextResponse.json(
         {
@@ -101,10 +101,27 @@ export async function POST(request: NextRequest) {
 
     const data = await response.json();
     const jobId = data.result;
+    if (!jobId) {
+      return NextResponse.json(
+        { error: "Meshy did not return a generation job id." },
+        { status: 502 },
+      );
+    }
+
+    const consumed = await consumeImage3dSlot(auth, true);
+    if (!consumed.ok) {
+      return NextResponse.json(
+        {
+          error: consumed.data.message || "Image-to-3D quota exceeded for your plan.",
+          entitlements: consumed.data.entitlements,
+        },
+        { status: consumed.status >= 400 ? consumed.status : 429 },
+      );
+    }
 
     return NextResponse.json({
       jobId,
-      entitlements: quota.data.entitlements,
+      entitlements: consumed.data.entitlements,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";

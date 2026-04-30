@@ -31,6 +31,7 @@ $SSH "$SERVER" "sudo chown -R '$REMOTE_OWNER' '$REMOTE_DIR'"
 
 echo "==> Installing, building, and restarting PM2 on server..."
 $SSH "$SERVER" "cd '$REMOTE_DIR' \
+  && if [ ! -f .env.production ]; then echo 'Missing production .env.production in $REMOTE_DIR'; exit 1; fi \
   && npm ci \
   && npm run '$NPM_BUILD_SCRIPT' \
   && if pm2 describe '$PM2_NAME' >/dev/null 2>&1; then PORT='$PORT' pm2 reload '$PM2_NAME' --update-env; else PORT='$PORT' pm2 start npm --name '$PM2_NAME' -- start; fi \

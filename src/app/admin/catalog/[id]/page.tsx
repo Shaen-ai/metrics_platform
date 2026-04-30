@@ -21,8 +21,8 @@ import {
   isLikelyUploadSizeLimitMessage,
   isMaxUploadError,
 } from "@/lib/uploadLimits";
-import { parseCommaCategoryTags } from "@/lib/catalogCategoryTags";
 import Model3DGenerator from "@/components/Model3DGenerator";
+import { CatalogAdditionalCategoriesDropdown } from "@/components/CatalogAdditionalCategoriesDropdown";
 
 export default function EditCatalogItemPage() {
   const router = useRouter();
@@ -35,7 +35,7 @@ export default function EditCatalogItemPage() {
     model: "",
     description: "",
     category: "",
-    additionalCategories: "",
+    additionalCategories: [] as string[],
     price: "",
     currency: "AMD",
     deliveryDays: "",
@@ -54,12 +54,28 @@ export default function EditCatalogItemPage() {
   const itemId = params.id as string;
   const item = catalogItems.find((i) => i.id === itemId);
 
-  useEffect(() => { fetchCatalogItems().catch(() => {}); fetchModes().catch(() => {}); }, []);
+  useEffect(() => { fetchCatalogItems().catch(() => {}); fetchModes().catch(() => {}); }, [fetchCatalogItems, fetchModes]);
 
-  const selectedMode = modes.find((m) => m.id === currentUser?.selectedModeId);
-  const adminSubModes = selectedMode?.subModes.filter((sm) =>
-    currentUser?.selectedSubModeIds?.includes(sm.id)
-  ) ?? [];
+  const selectedSubModeIds = new Set(currentUser?.selectedSubModeIds ?? []);
+  const adminSubModes = modes.flatMap((mode) =>
+    mode.subModes
+      .filter((sm) => selectedSubModeIds.has(sm.id) || sm.id === item?.subModeId)
+      .map((sm) => ({ ...sm, modeName: mode.name, modeId: mode.id })),
+  );
+  const primaryCategorySlug =
+    adminSubModes.find((sm) => sm.id === formData.category)?.slug ??
+    adminSubModes.find((sm) => sm.slug === formData.category)?.slug ??
+    formData.category;
+  const additionalCategoryOptions = [
+    ...adminSubModes.map((sm) => ({
+      value: sm.slug,
+      label: `${sm.modeName} / ${sm.name}`,
+      disabled: sm.slug === primaryCategorySlug,
+    })),
+    ...formData.additionalCategories
+      .filter((value) => !adminSubModes.some((sm) => sm.slug === value))
+      .map((value) => ({ value, label: value })),
+  ];
 
   useEffect(() => {
     if (item) {
@@ -67,8 +83,8 @@ export default function EditCatalogItemPage() {
         name: item.name,
         model: item.model || "",
         description: item.description,
-        category: item.category,
-        additionalCategories: (item.additionalCategories ?? []).join(", "),
+        category: item.subModeId || item.category,
+        additionalCategories: item.additionalCategories ?? [],
         price: item.price.toString(),
         currency: item.currency,
         deliveryDays: item.deliveryDays.toString(),
@@ -98,6 +114,22 @@ export default function EditCatalogItemPage() {
     setFormData((prev) => ({
       ...prev,
       [name]: type === "checkbox" ? (e.target as HTMLInputElement).checked : value,
+    }));
+  };
+
+  const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value;
+    const selectedSlug =
+      adminSubModes.find((sm) => sm.id === value)?.slug ??
+      adminSubModes.find((sm) => sm.slug === value)?.slug ??
+      value;
+
+    setFormData((prev) => ({
+      ...prev,
+      category: value,
+      additionalCategories: prev.additionalCategories.filter(
+        (category) => category !== selectedSlug,
+      ),
     }));
   };
 
@@ -150,12 +182,19 @@ export default function EditCatalogItemPage() {
     e.preventDefault();
     setIsLoading(true);
 
+    const selectedSubMode =
+      adminSubModes.find((sm) => sm.id === formData.category) ??
+      adminSubModes.find((sm) => sm.slug === formData.category);
+    const extraTags = formData.additionalCategories.filter(
+      (category) => category !== (selectedSubMode?.slug ?? formData.category),
+    );
+
     await updateCatalogItem(itemId, {
       name: formData.name,
       model: formData.model || undefined,
       description: formData.description,
-      category: formData.category,
-      additionalCategories: parseCommaCategoryTags(formData.additionalCategories),
+      category: selectedSubMode?.slug ?? formData.category,
+      additionalCategories: extraTags,
       price: parseFloat(formData.price) || 0,
       currency: formData.currency,
       deliveryDays: parseInt(formData.deliveryDays) || 7,
@@ -167,6 +206,8 @@ export default function EditCatalogItemPage() {
       },
       images: imageUrls,
       availableColors: colors.filter((c) => c.name.trim() !== ""),
+      modeId: selectedSubMode?.modeId,
+      subModeId: selectedSubMode?.id,
       isActive: formData.isActive,
     });
 
@@ -225,14 +266,14 @@ export default function EditCatalogItemPage() {
               <select
                 name="category"
                 value={formData.category}
-                onChange={handleChange}
+                onChange={handleCategoryChange}
                 className="w-full h-10 px-3 rounded-lg border border-[var(--input)] bg-[var(--background)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
                 required
               >
                 <option value="">{t("materials.selectCategory")}</option>
                 {adminSubModes.map((sm) => (
-                  <option key={sm.id} value={sm.slug}>
-                    {sm.name}
+                  <option key={sm.id} value={sm.id}>
+                    {sm.modeName} / {sm.name}
                   </option>
                 ))}
               </select>
@@ -242,13 +283,19 @@ export default function EditCatalogItemPage() {
               <label className="block text-sm font-medium mb-1.5">
                 {t("catalog.additionalCategories")}
               </label>
-              <textarea
-                name="additionalCategories"
+              <CatalogAdditionalCategoriesDropdown
+                options={additionalCategoryOptions}
                 value={formData.additionalCategories}
-                onChange={handleChange}
-                rows={2}
-                placeholder="kitchen, outdoor, living-room"
-                className="w-full px-3 py-2 rounded-lg border border-[var(--input)] bg-[var(--background)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] text-sm"
+                onChange={(additionalCategories) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    additionalCategories: additionalCategories.filter(
+                      (category) => category !== primaryCategorySlug,
+                    ),
+                  }))
+                }
+                placeholder={t("catalog.additionalCategoriesPlaceholder")}
+                emptyLabel={t("catalog.noAdditionalCategories")}
               />
               <p className="text-xs text-[var(--muted-foreground)] mt-1.5">
                 {t("catalog.additionalCategoriesHint")}
@@ -386,6 +433,13 @@ export default function EditCatalogItemPage() {
               currentModelUrl={item.modelUrl}
               currentStatus={item.modelStatus}
               currentJobId={item.modelJobId}
+              onModelQueued={(jobId) =>
+                updateCatalogItem(itemId, {
+                  modelJobId: jobId,
+                  modelStatus: "queued",
+                  modelError: "",
+                })
+              }
               onModelReady={(url) => updateCatalogItem(itemId, { modelUrl: url, modelStatus: "done" })}
             />
 

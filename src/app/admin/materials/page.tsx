@@ -58,6 +58,14 @@ const MATERIAL_TYPE_ORDER: string[] = [
   "worktop",
   "slide",
   "hinge",
+  "handle",
+  "metal",
+  "fabric",
+  "boucle",
+  "leather",
+  "glass",
+  "plastic",
+  "stone",
 ];
 
 /** Preferred chip order for brand filters (extend when the full list is provided). */
@@ -221,6 +229,14 @@ export default function MaterialsPage() {
     { value: "worktop", label: t("material.worktop") },
     { value: "slide", label: t("material.slide") },
     { value: "hinge", label: t("material.hinge") },
+    { value: "handle", label: t("material.handle") },
+    { value: "metal", label: t("material.metal") },
+    { value: "fabric", label: t("material.fabric") },
+    { value: "boucle", label: t("material.boucle") },
+    { value: "leather", label: t("material.leather") },
+    { value: "glass", label: t("material.glass") },
+    { value: "plastic", label: t("material.plastic") },
+    { value: "stone", label: t("material.stone") },
   ];
 
   const materialCategories = [

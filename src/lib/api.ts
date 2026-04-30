@@ -113,7 +113,7 @@ class ApiClient {
     return res;
   }
 
-  async register(data: { email: string; password: string; name: string; company_name: string }) {
+  async register(data: { email: string; password: string; name: string; company_name: string; language?: "en" | "ru" }) {
     const res = await this.request<{
       user?: unknown;
       token?: string;

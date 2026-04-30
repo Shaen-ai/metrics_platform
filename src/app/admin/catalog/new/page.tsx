@@ -21,6 +21,7 @@ import {
   Image as ImageIcon,
   Box,
   Loader2,
+  Crown,
 } from "lucide-react";
 import { currencies } from "@/lib/constants";
 import { api } from "@/lib/api";
@@ -30,7 +31,20 @@ import {
   isLikelyUploadSizeLimitMessage,
   isMaxUploadError,
 } from "@/lib/uploadLimits";
-import { parseCommaCategoryTags } from "@/lib/catalogCategoryTags";
+import { CatalogAdditionalCategoriesDropdown } from "@/components/CatalogAdditionalCategoriesDropdown";
+import { getPricingPageUrl } from "@/lib/billingLinks";
+import { getLandingUrl } from "@/lib/landingUrl";
+import {
+  Image3dUpgradeModal,
+  getImage3dBlockReason,
+  getImage3dErrorReason,
+  type Image3dBlockReason,
+} from "@/components/Image3dUpgradeModal";
+
+function isSubscriptionRequiredError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : "";
+  return /active subscription|required to use this feature|subscription is required/i.test(message);
+}
 
 export default function NewCatalogItemPage() {
   const router = useRouter();
@@ -42,7 +56,7 @@ export default function NewCatalogItemPage() {
     model: "",
     description: "",
     category: "",
-    additionalCategories: "",
+    additionalCategories: [] as string[],
     price: "",
     currency: currentUser?.currency || "AMD",
     deliveryDays: "",
@@ -66,19 +80,42 @@ export default function NewCatalogItemPage() {
   const [texturePrompt, setTexturePrompt] = useState("");
   const [dragOver, setDragOver] = useState(false);
   const [uploadTooLargeOpen, setUploadTooLargeOpen] = useState(false);
+  const [upgradeDialogOpen, setUpgradeDialogOpen] = useState(false);
+  const [image3dModalOpen, setImage3dModalOpen] = useState(false);
+  const [image3dModalReason, setImage3dModalReason] =
+    useState<Image3dBlockReason>("upgrade");
   const glbRef = useRef<HTMLInputElement>(null);
   const imgRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { fetchModes().catch(() => {}); }, []);
+  useEffect(() => { fetchModes().catch(() => {}); }, [fetchModes]);
 
   useEffect(() => {
     return () => aiImagePreviews.forEach((u) => URL.revokeObjectURL(u));
   }, [aiImagePreviews]);
 
-  const selectedMode = modes.find((m) => m.id === currentUser?.selectedModeId);
-  const adminSubModes = selectedMode?.subModes.filter((sm) =>
-    currentUser?.selectedSubModeIds?.includes(sm.id)
-  ) ?? [];
+  const selectedSubModeIds = new Set(currentUser?.selectedSubModeIds ?? []);
+  const adminSubModes = modes.flatMap((mode) =>
+    mode.subModes
+      .filter((sm) => selectedSubModeIds.has(sm.id))
+      .map((sm) => ({ ...sm, modeName: mode.name, modeId: mode.id })),
+  );
+  const primaryCategorySlug =
+    adminSubModes.find((sm) => sm.id === formData.category)?.slug ??
+    adminSubModes.find((sm) => sm.slug === formData.category)?.slug ??
+    formData.category;
+  const additionalCategoryOptions = [
+    ...adminSubModes.map((sm) => ({
+      value: sm.slug,
+      label: `${sm.modeName} / ${sm.name}`,
+      disabled: sm.slug === primaryCategorySlug,
+    })),
+    ...formData.additionalCategories
+      .filter((value) => !adminSubModes.some((sm) => sm.slug === value))
+      .map((value) => ({ value, label: value })),
+  ];
+  const hasActiveSubscription = currentUser?.entitlements?.subscriptionActive === true;
+  const image3dBlockReason = getImage3dBlockReason(currentUser?.entitlements);
+  const pricingUrl = (getPricingPageUrl() || `${getLandingUrl()}/pricing`).trim();
 
   const handleChange = (
     e: React.ChangeEvent<
@@ -92,6 +129,22 @@ export default function NewCatalogItemPage() {
         type === "checkbox"
           ? (e.target as HTMLInputElement).checked
           : value,
+    }));
+  };
+
+  const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value;
+    const selectedSlug =
+      adminSubModes.find((sm) => sm.id === value)?.slug ??
+      adminSubModes.find((sm) => sm.slug === value)?.slug ??
+      value;
+
+    setFormData((prev) => ({
+      ...prev,
+      category: value,
+      additionalCategories: prev.additionalCategories.filter(
+        (category) => category !== selectedSlug,
+      ),
     }));
   };
 
@@ -251,6 +304,17 @@ export default function NewCatalogItemPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!hasActiveSubscription) {
+      setUpgradeDialogOpen(true);
+      return;
+    }
+    if (aiImages.length > 0 && !glbFile && image3dBlockReason) {
+      setImage3dModalReason(image3dBlockReason);
+      setImage3dModalOpen(true);
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -265,13 +329,18 @@ export default function NewCatalogItemPage() {
         modelStatus = "done";
       }
 
-      const extraTags = parseCommaCategoryTags(formData.additionalCategories);
+      const selectedSubMode =
+        adminSubModes.find((sm) => sm.id === formData.category) ??
+        adminSubModes.find((sm) => sm.slug === formData.category);
+      const extraTags = formData.additionalCategories.filter(
+        (category) => category !== (selectedSubMode?.slug ?? formData.category),
+      );
 
       const newItem = await addCatalogItem({
         name: formData.name,
         model: formData.model || undefined,
         description: formData.description,
-        category: formData.category,
+        category: selectedSubMode?.slug ?? formData.category,
         additionalCategories: extraTags.length > 0 ? extraTags : undefined,
         price: parseFloat(formData.price) || 0,
         currency: formData.currency,
@@ -284,9 +353,8 @@ export default function NewCatalogItemPage() {
         },
         images: imageUrls,
         availableColors: colors.filter((c) => c.name.trim() !== ""),
-        modeId: currentUser?.selectedModeId || "mode-furniture",
-        subModeId: adminSubModes.find((sm) => sm.slug === formData.category)?.id
-          || currentUser?.selectedSubModeIds?.[0] || "sub-kitchen",
+        modeId: selectedSubMode?.modeId || currentUser?.selectedModeId || "mode-furniture",
+        subModeId: selectedSubMode?.id || currentUser?.selectedSubModeIds?.[0] || "sub-kitchen",
         isActive: formData.isActive,
         modelUrl,
         modelStatus,
@@ -307,7 +375,7 @@ export default function NewCatalogItemPage() {
           modelJobId: jobId,
           modelStatus: "queued",
         });
-        router.push(`/admin/catalog/${newItem.id}`);
+        router.push("/admin/catalog");
       } else {
         router.push("/admin/catalog");
       }
@@ -315,8 +383,16 @@ export default function NewCatalogItemPage() {
       const msg = err instanceof Error ? err.message : "";
       if (isMaxUploadError(err) || isLikelyUploadSizeLimitMessage(msg)) {
         setUploadTooLargeOpen(true);
+      } else if (isSubscriptionRequiredError(err)) {
+        setUpgradeDialogOpen(true);
       } else {
-        console.error("Failed to create item:", err);
+        const reason = getImage3dErrorReason(msg, 0);
+        if (reason) {
+          setImage3dModalReason(reason);
+          setImage3dModalOpen(true);
+        } else {
+          console.error("Failed to create item:", err);
+        }
       }
       setIsLoading(false);
     }
@@ -331,6 +407,31 @@ export default function NewCatalogItemPage() {
         <ArrowLeft className="w-4 h-4" />
         {t("common.back")}
       </button>
+
+      {!hasActiveSubscription && (
+        <div className="mb-4 rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 p-4 shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+                <Crown className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="font-semibold text-amber-950">
+                  {t("catalog.subscriptionRequiredTitle")}
+                </p>
+                <p className="mt-1 text-sm text-amber-900">
+                  {t("catalog.subscriptionRequiredBanner")}
+                </p>
+              </div>
+            </div>
+            <Button type="button" variant="primary" className="shrink-0" asChild>
+              <a href={pricingUrl} target="_blank" rel="noopener noreferrer">
+                {t("catalog.viewPricing")}
+              </a>
+            </Button>
+          </div>
+        </div>
+      )}
 
       <Card>
         <CardHeader>
@@ -374,14 +475,14 @@ export default function NewCatalogItemPage() {
               <select
                 name="category"
                 value={formData.category}
-                onChange={handleChange}
+                onChange={handleCategoryChange}
                 className="w-full h-10 px-3 rounded-lg border border-[var(--input)] bg-[var(--background)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
                 required
               >
                 <option value="">{t("materials.selectCategory")}</option>
                 {adminSubModes.map((sm) => (
-                  <option key={sm.id} value={sm.slug}>
-                    {sm.name}
+                  <option key={sm.id} value={sm.id}>
+                    {sm.modeName} / {sm.name}
                   </option>
                 ))}
               </select>
@@ -391,13 +492,19 @@ export default function NewCatalogItemPage() {
               <label className="block text-sm font-medium mb-1.5">
                 {t("catalog.additionalCategories")}
               </label>
-              <textarea
-                name="additionalCategories"
+              <CatalogAdditionalCategoriesDropdown
+                options={additionalCategoryOptions}
                 value={formData.additionalCategories}
-                onChange={handleChange}
-                rows={2}
-                placeholder="kitchen, outdoor, living-room"
-                className="w-full px-3 py-2 rounded-lg border border-[var(--input)] bg-[var(--background)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] text-sm"
+                onChange={(additionalCategories) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    additionalCategories: additionalCategories.filter(
+                      (category) => category !== primaryCategorySlug,
+                    ),
+                  }))
+                }
+                placeholder={t("catalog.additionalCategoriesPlaceholder")}
+                emptyLabel={t("catalog.noAdditionalCategories")}
               />
               <p className="text-xs text-[var(--muted-foreground)] mt-1.5">
                 {t("catalog.additionalCategoriesHint")}
@@ -670,7 +777,14 @@ export default function NewCatalogItemPage() {
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={() => imgRef.current?.click()}
+                        onClick={() => {
+                          if (image3dBlockReason) {
+                            setImage3dModalReason(image3dBlockReason);
+                            setImage3dModalOpen(true);
+                            return;
+                          }
+                          imgRef.current?.click();
+                        }}
                         className="flex-1"
                       >
                         <ImageIcon className="w-3.5 h-3.5 mr-1" />
@@ -770,6 +884,21 @@ export default function NewCatalogItemPage() {
         title={t("upload.tooLargeTitle")}
         message={t("upload.tooLargeMessage")}
         confirmText={t("common.ok")}
+      />
+      <MessageDialog
+        open={upgradeDialogOpen}
+        onClose={() => setUpgradeDialogOpen(false)}
+        title={t("catalog.subscriptionRequiredTitle")}
+        message={t("catalog.subscriptionRequiredMessage").replace("{url}", pricingUrl)}
+        confirmText={t("common.cancel")}
+        actionText={t("catalog.viewPricing")}
+        actionHref={pricingUrl}
+        variant="info"
+      />
+      <Image3dUpgradeModal
+        open={image3dModalOpen}
+        onClose={() => setImage3dModalOpen(false)}
+        reason={image3dModalReason}
       />
     </div>
   );

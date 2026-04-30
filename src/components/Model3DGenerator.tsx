@@ -7,9 +7,15 @@ import {
   useCallback,
   forwardRef,
   useImperativeHandle,
+  type CSSProperties,
 } from "react";
 import { Button, MessageDialog } from "@/components/ui";
-import { Image3dUpgradeModal, isImage3dLimitReached } from "@/components/Image3dUpgradeModal";
+import {
+  Image3dUpgradeModal,
+  getImage3dBlockReason,
+  getImage3dErrorReason,
+  type Image3dBlockReason,
+} from "@/components/Image3dUpgradeModal";
 import { api } from "@/lib/api";
 import { useStore } from "@/lib/store";
 import { toRelativeStorageUrl } from "@/lib/utils";
@@ -44,9 +50,87 @@ interface Model3DGeneratorProps {
   currentStatus?: string;
   currentJobId?: string;
   onModelReady: (modelUrl: string) => void;
+  onModelQueued?: (jobId: string) => void | Promise<void>;
 }
 
 type GenerationStatus = "idle" | "uploading" | "queued" | "processing" | "done" | "failed";
+
+const generationSteps = [
+  "Images selected",
+  "Uploading",
+  "Queued",
+  "Generating",
+  "Ready",
+] as const;
+
+const modelViewerPreviewStyle = {
+  width: "100%",
+  height: "100%",
+  minHeight: 160,
+  "--progress-bar-height": "0px",
+} as CSSProperties;
+
+function stepIndexForStatus(status: GenerationStatus, hasPendingImages: boolean): number {
+  if (status === "done") return 4;
+  if (status === "processing") return 3;
+  if (status === "queued") return 2;
+  if (status === "uploading") return 1;
+  if (hasPendingImages) return 0;
+  return -1;
+}
+
+function GenerationStepper({
+  status,
+  hasPendingImages,
+}: {
+  status: GenerationStatus;
+  hasPendingImages: boolean;
+}) {
+  const activeIndex = stepIndexForStatus(status, hasPendingImages);
+  if (activeIndex < 0 && status !== "failed") return null;
+
+  return (
+    <div className="rounded-xl border border-[var(--border)] bg-[var(--muted)]/30 px-3 py-3">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <p className="text-xs font-semibold text-[var(--foreground)]">
+          Image-to-3D progress
+        </p>
+        <p className="text-[11px] text-[var(--muted-foreground)]">
+          {status === "failed" ? "Needs attention" : generationSteps[Math.max(activeIndex, 0)]}
+        </p>
+      </div>
+      <div className="grid grid-cols-5 gap-1.5">
+        {generationSteps.map((label, index) => {
+          const complete = status === "done" || (activeIndex > index && status !== "failed");
+          const current = activeIndex === index && status !== "failed";
+          return (
+            <div key={label} className="min-w-0">
+              <div
+                className={`h-1.5 rounded-full transition-colors ${
+                  complete
+                    ? "bg-emerald-500"
+                    : current
+                      ? "bg-blue-500"
+                      : "bg-[var(--border)]"
+                }`}
+              />
+              <p
+                className={`mt-1 truncate text-[10px] ${
+                  complete || current
+                    ? "font-medium text-[var(--foreground)]"
+                    : "text-[var(--muted-foreground)]"
+                }`}
+                title={label}
+              >
+                {label}
+              </p>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -70,14 +154,15 @@ const Model3DGenerator = forwardRef<Model3DGeneratorHandle | null, Model3DGenera
   currentStatus,
   currentJobId,
   onModelReady,
+  onModelQueued,
     },
     ref
   ) {
   const { t } = useTranslation();
   const refreshProfile = useStore((s) => s.refreshProfile);
-  const image3dRemaining = useStore((s) => s.currentUser?.entitlements?.image3dRemaining);
-  const noImage3dQuota =
-    typeof image3dRemaining === "number" && image3dRemaining <= 0;
+  const image3dEntitlements = useStore((s) => s.currentUser?.entitlements);
+  const image3dBlockReason = getImage3dBlockReason(image3dEntitlements);
+  const image3dBlocked = image3dBlockReason !== null;
   const [status, setStatus] = useState<GenerationStatus>(
     currentModelUrl
       ? "done"
@@ -94,6 +179,8 @@ const Model3DGenerator = forwardRef<Model3DGeneratorHandle | null, Model3DGenera
   const [texturePrompt, setTexturePrompt] = useState("");
   const [modelViewerLoaded, setModelViewerLoaded] = useState(false);
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
+  const [upgradeModalReason, setUpgradeModalReason] =
+    useState<Image3dBlockReason>("limit");
   const [uploadTooLargeOpen, setUploadTooLargeOpen] = useState(false);
 
   const imgRef = useRef<HTMLInputElement>(null);
@@ -199,7 +286,8 @@ const Model3DGenerator = forwardRef<Model3DGeneratorHandle | null, Model3DGenera
 
   const submitMeshyJob = useCallback(async (): Promise<string | null> => {
     if (pendingImages.length === 0) return null;
-    if (noImage3dQuota) {
+    if (image3dBlockReason) {
+      setUpgradeModalReason(image3dBlockReason);
       setUpgradeModalOpen(true);
       return null;
     }
@@ -228,7 +316,9 @@ const Model3DGenerator = forwardRef<Model3DGeneratorHandle | null, Model3DGenera
 
         if (!res.ok || !data.jobId) {
           const msg = data.error || "Failed to start 3D generation";
-          if (isImage3dLimitReached(msg, res.status)) {
+          const reason = getImage3dErrorReason(msg, res.status);
+          if (reason) {
+            setUpgradeModalReason(reason);
             setUpgradeModalOpen(true);
             setStatus("idle");
             return null;
@@ -238,12 +328,15 @@ const Model3DGenerator = forwardRef<Model3DGeneratorHandle | null, Model3DGenera
 
         setJobId(data.jobId);
         setStatus("queued");
+        void onModelQueued?.(data.jobId);
         handleImagesCancel();
         void refreshProfile();
         return data.jobId;
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Upload failed";
-        if (isImage3dLimitReached(msg, 0)) {
+        const reason = getImage3dErrorReason(msg, 0);
+        if (reason) {
+          setUpgradeModalReason(reason);
           setUpgradeModalOpen(true);
           setStatus("idle");
           return null;
@@ -261,7 +354,8 @@ const Model3DGenerator = forwardRef<Model3DGeneratorHandle | null, Model3DGenera
   }, [
     pendingImages,
     texturePrompt,
-    noImage3dQuota,
+    image3dBlockReason,
+    onModelQueued,
     refreshProfile,
   ]);
 
@@ -358,7 +452,8 @@ const Model3DGenerator = forwardRef<Model3DGeneratorHandle | null, Model3DGenera
   const isProcessing = status === "queued" || status === "processing" || status === "uploading";
 
   const onAiFromImages = () => {
-    if (noImage3dQuota) {
+    if (image3dBlockReason) {
+      setUpgradeModalReason(image3dBlockReason);
       setUpgradeModalOpen(true);
       return;
     }
@@ -367,7 +462,11 @@ const Model3DGenerator = forwardRef<Model3DGeneratorHandle | null, Model3DGenera
 
   return (
     <div className="space-y-3">
-      <Image3dUpgradeModal open={upgradeModalOpen} onClose={() => setUpgradeModalOpen(false)} />
+      <Image3dUpgradeModal
+        open={upgradeModalOpen}
+        onClose={() => setUpgradeModalOpen(false)}
+        reason={upgradeModalReason}
+      />
       <MessageDialog
         open={uploadTooLargeOpen}
         onClose={() => setUploadTooLargeOpen(false)}
@@ -381,21 +480,27 @@ const Model3DGenerator = forwardRef<Model3DGeneratorHandle | null, Model3DGenera
         3D Model
       </label>
 
-      {noImage3dQuota && (
+      {image3dBlocked && (
         <div className="rounded-xl border border-violet-200/80 bg-gradient-to-r from-violet-50/90 to-fuchsia-50/50 px-3 py-2.5 dark:border-violet-900/50 dark:from-violet-950/40 dark:to-fuchsia-950/20">
           <p className="text-xs leading-relaxed text-violet-950 dark:text-violet-100">
-            This month&apos;s Image-to-3D generations are used up. You can wait until next month or
-            upgrade for a higher limit.
+            {image3dBlockReason === "upgrade"
+              ? "Upgrade your plan to use Image-to-3D generation."
+              : "This month's Image-to-3D generations are used up. You can wait until next month or upgrade for a higher limit."}
           </p>
           <button
             type="button"
-            onClick={() => setUpgradeModalOpen(true)}
+            onClick={() => {
+              setUpgradeModalReason(image3dBlockReason ?? "limit");
+              setUpgradeModalOpen(true);
+            }}
             className="mt-1.5 text-xs font-medium text-violet-700 underline decoration-violet-300 underline-offset-2 hover:text-violet-900 dark:text-violet-300 dark:hover:text-violet-100"
           >
             View plan options
           </button>
         </div>
       )}
+
+      <GenerationStepper status={status} hasPendingImages={pendingImages.length > 0} />
 
       {/* Status indicators */}
       {(status === "queued" || status === "processing" || status === "uploading") && (
@@ -404,13 +509,15 @@ const Model3DGenerator = forwardRef<Model3DGeneratorHandle | null, Model3DGenera
           <div>
             <p className="text-sm font-medium text-blue-800">
               {status === "uploading"
-                ? "Uploading image..."
+                ? "Uploading image to Meshy..."
                 : status === "queued"
                   ? "Queued for generation"
                   : "Generating 3D model..."}
             </p>
             <p className="text-xs text-blue-500 mt-0.5">
-              This may take a few minutes
+              {status === "queued"
+                ? "Meshy accepted the job. We will start polling automatically."
+                : "This may take a few minutes. You can leave this page and come back later."}
             </p>
           </div>
         </div>
@@ -450,15 +557,11 @@ const Model3DGenerator = forwardRef<Model3DGeneratorHandle | null, Model3DGenera
                 field-of-view="42deg"
                 min-field-of-view="18deg"
                 max-field-of-view="55deg"
-                min-camera-orbit="0deg 22.5deg 112%"
-                max-camera-orbit="180deg 90deg 400%"
+                min-camera-orbit="auto 22.5deg 112%"
+                max-camera-orbit="auto 90deg 400%"
                 shadow-intensity="1"
                 exposure="1"
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  minHeight: 160,
-                }}
+                style={modelViewerPreviewStyle}
               />
             ) : (
               <div className="flex items-center justify-center h-full text-sm text-[var(--muted-foreground)]">
@@ -469,9 +572,14 @@ const Model3DGenerator = forwardRef<Model3DGeneratorHandle | null, Model3DGenera
           <div className="px-3 py-2 bg-emerald-50 border-t border-emerald-200 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <CheckCircle className="w-4 h-4 text-emerald-600" />
-              <span className="text-xs font-medium text-emerald-800">
-                3D model ready
-              </span>
+              <div>
+                <span className="block text-xs font-medium text-emerald-800">
+                  3D model ready
+                </span>
+                <span className="block text-[11px] text-emerald-700">
+                  This item now uses the generated GLB in admin and published views.
+                </span>
+              </div>
             </div>
             <button
               type="button"
@@ -542,7 +650,8 @@ const Model3DGenerator = forwardRef<Model3DGeneratorHandle | null, Model3DGenera
                   type="button"
                   size="sm"
                   onClick={() => {
-                    if (noImage3dQuota) {
+                    if (image3dBlockReason) {
+                      setUpgradeModalReason(image3dBlockReason);
                       setUpgradeModalOpen(true);
                       return;
                     }

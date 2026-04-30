@@ -39,14 +39,15 @@ export default function ModelViewerCard({
         mv.setAttribute("min-field-of-view", "18deg");
         mv.setAttribute("max-field-of-view", "55deg");
         /** Keep a margin when orbit/zooming so the mesh stays inside the frame. */
-        mv.setAttribute("min-camera-orbit", "0deg 22.5deg 112%");
-        mv.setAttribute("max-camera-orbit", "180deg 90deg 400%");
+        mv.setAttribute("min-camera-orbit", "auto 22.5deg 112%");
+        mv.setAttribute("max-camera-orbit", "auto 90deg 400%");
         mv.setAttribute("shadow-intensity", "0.5");
         mv.setAttribute("exposure", "1");
         mv.style.width = "100%";
         mv.style.height = "100%";
         mv.style.display = "block";
         mv.style.minHeight = "160px";
+        mv.style.setProperty("--progress-bar-height", "0px");
 
         mv.addEventListener("error", () => {
           if (!cancelled) setStatus("failed");

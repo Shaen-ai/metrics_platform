@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { Suspense, useState, useEffect } from "react";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useStore, useHydration } from "@/lib/store";
 import { useTranslation } from "@/hooks/useTranslation";
@@ -12,27 +12,47 @@ import {
   Box,
   ShoppingCart,
   Settings,
+  Store,
+  CreditCard,
+  UserRound,
+  Palette,
   LogOut,
   Menu,
   X,
   ChevronDown,
-  Globe,
   Crown,
 } from "lucide-react";
-import { languages, normalizeLanguageCode } from "@/lib/translations";
 import { Button } from "@/components/ui";
 import { ModeIcon } from "@/components/icons/ModeIcons";
 import { getPricingPageUrl } from "@/lib/billingLinks";
 import { getLandingUrl } from "@/lib/landingUrl";
+import { LanguagePreferenceButton } from "@/components/LanguagePreferenceButton";
+
+function AdminLoading() {
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--primary)]"></div>
+    </div>
+  );
+}
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <Suspense fallback={<AdminLoading />}>
+      <AdminLayoutContent>{children}</AdminLayoutContent>
+    </Suspense>
+  );
+}
+
+function AdminLayoutContent({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { t } = useTranslation();
-  const { currentUser, isAuthenticated, logout, getModeById, getSubModesByIds, fetchModes, updateUser, restoreSession } = useStore();
+  const { currentUser, isAuthenticated, logout, modes, fetchModes, updateUser, restoreSession } = useStore();
   const hydrated = useHydration();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [isRedirecting, setIsRedirecting] = useState(false);
+  const isModeSelection = pathname?.startsWith("/admin/modes");
 
   useEffect(() => {
     if (!hydrated) return;
@@ -41,60 +61,48 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     if (isAuthenticated) fetchModes().catch(() => {});
-  }, [isAuthenticated]);
+  }, [isAuthenticated, fetchModes]);
 
   useEffect(() => {
     if (!hydrated) return;
 
-    const isModeSelection = pathname?.startsWith("/admin/modes");
-
     if (!isAuthenticated) {
-      setIsRedirecting(true);
       router.push("/login");
       return;
     }
 
     if (!isModeSelection && (!currentUser?.selectedModeId || !currentUser?.selectedSubModeIds?.length)) {
-      setIsRedirecting(true);
       router.push("/admin/modes");
       return;
     }
-
-    setIsRedirecting(false);
-  }, [hydrated, isAuthenticated, currentUser?.selectedModeId, currentUser?.selectedSubModeIds, pathname, router]);
+  }, [hydrated, isAuthenticated, currentUser?.selectedModeId, currentUser?.selectedSubModeIds, isModeSelection, router]);
 
   if (!hydrated) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--primary)]"></div>
-      </div>
-    );
+    return <AdminLoading />;
   }
 
-  if (isRedirecting || !isAuthenticated) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--primary)]"></div>
-      </div>
-    );
+  if (
+    !isAuthenticated ||
+    (!isModeSelection && (!currentUser?.selectedModeId || !currentUser?.selectedSubModeIds?.length))
+  ) {
+    return <AdminLoading />;
   }
-
-  const isModeSelection = pathname?.startsWith("/admin/modes");
 
   if (isModeSelection) {
     return <>{children}</>;
   }
 
   if (!currentUser?.selectedModeId || !currentUser?.selectedSubModeIds?.length) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--primary)]"></div>
-      </div>
-    );
+    return <AdminLoading />;
   }
 
-  const selectedMode = getModeById(currentUser.selectedModeId);
-  const selectedSubModes = getSubModesByIds(currentUser.selectedModeId, currentUser.selectedSubModeIds);
+  const selectedSubModeIdSet = new Set(currentUser.selectedSubModeIds);
+  const selectedModes = modes.filter((mode) =>
+    mode.subModes.some((subMode) => selectedSubModeIdSet.has(subMode.id)),
+  );
+  const selectedModeLabel = selectedModes.length
+    ? selectedModes.map((mode) => mode.name).join(", ")
+    : currentUser.companyName;
 
   const planTier =
     currentUser.entitlements?.planTier ?? currentUser.planTier ?? "free";
@@ -109,6 +117,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { href: "/admin/modules", icon: Box, label: t("nav.modules") },
     { href: "/admin/orders", icon: ShoppingCart, label: t("nav.orders") },
     { href: "/admin/settings", icon: Settings, label: t("nav.settings") },
+  ];
+
+  const isSettingsActive = pathname?.startsWith("/admin/settings") === true;
+  const activeSettingsTab = isSettingsActive ? searchParams.get("tab") ?? "storefront" : null;
+  const settingsNavItems = [
+    { tab: "storefront", icon: Store, label: t("settings.tabs.storefront") },
+    { tab: "billing", icon: CreditCard, label: t("settings.tabs.billing") },
+    { tab: "account", icon: UserRound, label: t("settings.tabs.account") },
+    { tab: "appearance", icon: Palette, label: t("settings.tabs.appearance") },
+    { tab: "planners", icon: Layers, label: t("settings.tabs.planners") },
   ];
 
   const handleLogout = async () => {
@@ -137,7 +155,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 h-full w-64 bg-white border-r border-[#F0E6D8] z-50 transform transition-transform lg:translate-x-0 ${
+        className={`fixed top-0 left-0 z-50 flex h-full w-64 flex-col bg-white border-r border-[#F0E6D8] transform transition-transform lg:translate-x-0 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -157,40 +175,65 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           className="block m-4 p-3 bg-[#FEF3E7] rounded-xl hover:bg-[#FEF3E7]/80 transition-colors"
         >
           <div className="flex items-center gap-2">
-            {selectedMode && <ModeIcon name={selectedMode.icon} className="w-4 h-4 text-[#E8772E]" />}
-            <span className="text-sm font-medium text-[#1A1A1A]">{selectedMode?.name}</span>
+            {selectedModes[0] && <ModeIcon name={selectedModes[0].icon} className="w-4 h-4 text-[#E8772E]" />}
+            <span className="text-sm font-medium text-[#1A1A1A]">{selectedModeLabel}</span>
             <ChevronDown className="w-4 h-4 ml-auto text-[#6B7280]" />
           </div>
-          <p className="text-xs text-[#6B7280] mt-1">
-            {selectedSubModes.map((sm) => sm.name).join(", ")}
-          </p>
           <p className="text-xs text-[#E8772E] mt-1">{t("modes.clickToChange")}</p>
         </Link>
 
         {/* Navigation */}
-        <nav className={`p-4 space-y-1 ${showSidebarUpgrade ? "pb-44" : "pb-36"}`}>
+        <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto p-4">
           {navItems.map((item) => {
-            const isActive = pathname === item.href;
+            const isActive =
+              item.href === "/admin/settings"
+                ? isSettingsActive
+                : pathname === item.href;
             return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setSidebarOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${
-                  isActive
-                    ? "bg-[#FEF3E7] text-[#E8772E] font-medium"
-                    : "text-[#6B7280] hover:bg-[#FEF3E7]/60 hover:text-[#E8772E]"
-                }`}
-              >
-                <item.icon className="w-5 h-5" />
-                <span>{item.label}</span>
-              </Link>
+              <div key={item.href}>
+                <Link
+                  href={item.href}
+                  onClick={() => setSidebarOpen(false)}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${
+                    isActive
+                      ? "bg-[#FEF3E7] text-[#E8772E] font-medium"
+                      : "text-[#6B7280] hover:bg-[#FEF3E7]/60 hover:text-[#E8772E]"
+                  }`}
+                >
+                  <item.icon className="w-5 h-5" />
+                  <span>{item.label}</span>
+                </Link>
+
+                {item.href === "/admin/settings" && isSettingsActive && (
+                  <div className="mt-1 ml-8 space-y-0.5 border-l border-[#F0E6D8] pl-2">
+                    {settingsNavItems.map((subItem) => {
+                      const SubIcon = subItem.icon;
+                      const isSubActive = activeSettingsTab === subItem.tab;
+                      return (
+                        <Link
+                          key={subItem.tab}
+                          href={`/admin/settings?tab=${subItem.tab}`}
+                          onClick={() => setSidebarOpen(false)}
+                          className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
+                            isSubActive
+                              ? "bg-[#FEF3E7] text-[#E8772E] font-medium"
+                              : "text-[#6B7280] hover:bg-[#FEF3E7]/60 hover:text-[#E8772E]"
+                          }`}
+                        >
+                          <SubIcon className="w-4 h-4 shrink-0" />
+                          <span>{subItem.label}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             );
           })}
         </nav>
 
         {/* Upgrade CTA (above language — higher priority for revenue) */}
-        <div className="absolute bottom-4 left-4 right-4 space-y-2">
+        <div className="shrink-0 space-y-2 border-t border-[#F0E6D8] bg-white p-4">
           {showSidebarUpgrade && (
             <Button variant="primary" className="w-full font-semibold shadow-sm ring-1 ring-[#E8772E]/30" asChild>
               <a href={upgradePricingUrl} target="_blank" rel="noopener noreferrer">
@@ -199,21 +242,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               </a>
             </Button>
           )}
-          <button
-            onClick={() => {
-              const currentLang = normalizeLanguageCode(currentUser?.language);
-              const currentIdx = languages.findIndex((l) => l.code === currentLang);
-              const nextLang = languages[(currentIdx + 1) % languages.length];
-              updateUser({ language: nextLang.code } as Partial<import("@/lib/types").User>);
-            }}
+          <LanguagePreferenceButton
+            fallback={currentUser?.language}
+            onChange={(lang) => updateUser({ language: lang } as Partial<import("@/lib/types").User>)}
             className="flex items-center gap-3 px-3 py-2 w-full rounded-xl text-[#6B7280] hover:bg-[#FEF3E7]/60 hover:text-[#E8772E] transition-colors"
-          >
-            <Globe className="w-5 h-5" />
-            <span>
-              {languages.find((l) => l.code === normalizeLanguageCode(currentUser?.language))?.flag}{" "}
-              {languages.find((l) => l.code === normalizeLanguageCode(currentUser?.language))?.name}
-            </span>
-          </button>
+          />
           <Button variant="outline" className="w-full" onClick={handleLogout}>
             <LogOut className="w-4 h-4 mr-2" />
             {t("auth.logout")}

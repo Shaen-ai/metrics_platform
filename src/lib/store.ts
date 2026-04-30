@@ -225,6 +225,7 @@ export const useStore = create<AppState>()(
             password: data.password,
             name: data.name,
             company_name: data.companyName,
+            language: data.language,
           });
           if (res.token) {
             const user = normalizeUserFromApi(res.user as User);
@@ -312,6 +313,12 @@ export const useStore = create<AppState>()(
         if (updates.publicSiteLayout !== undefined) payload.public_site_layout = updates.publicSiteLayout;
         if (updates.publicSiteTexts !== undefined) payload.public_site_texts = updates.publicSiteTexts;
         if (updates.publicSiteTheme !== undefined) payload.public_site_theme = updates.publicSiteTheme;
+        if (updates.publicCatalogLayouts !== undefined) {
+          payload.public_catalog_layouts = updates.publicCatalogLayouts;
+        }
+        if (updates.publicCatalogDefaultLayout !== undefined) {
+          payload.public_catalog_default_layout = updates.publicCatalogDefaultLayout;
+        }
         if (updates.customDesignKey !== undefined) payload.custom_design_key = updates.customDesignKey;
 
         const res = await api.updateProfile(payload);
@@ -441,7 +448,10 @@ export const useStore = create<AppState>()(
             const res = await api.getMaterials();
             set({ materials: normalizeListResponse<Material>(res) });
           } catch (e) {
-            console.error("fetchMaterials failed", e);
+            const message = e instanceof Error ? e.message : "";
+            if (!/subscription|subscribed|active/i.test(message)) {
+              console.error("fetchMaterials failed", e);
+            }
           } finally {
             setTimeout(() => {
               materialsFetchPromise = null;

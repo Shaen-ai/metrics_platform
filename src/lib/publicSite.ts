@@ -76,3 +76,18 @@ export const publicSiteTextFields = [
   { key: "materialsSubtitle", label: "Materials subtitle" },
   { key: "footerTagline", label: "Footer tagline" },
 ] as const;
+
+export const DEFAULT_PUBLIC_CATALOG_LAYOUT = "grid";
+
+export const publicCatalogLayouts = [
+  { id: "grid", name: "Grid" },
+  { id: "list", name: "List" },
+  { id: "masonry", name: "Masonry" },
+  { id: "magazine", name: "Magazine" },
+  { id: "showcase", name: "Showcase" },
+  { id: "reels", name: "Reels" },
+  { id: "commerce", name: "Commerce" },
+  { id: "gallery", name: "Gallery" },
+] as const;
+
+export type PublicCatalogLayoutId = (typeof publicCatalogLayouts)[number]["id"];

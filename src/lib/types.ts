@@ -61,6 +61,8 @@ export interface User {
   publicSiteLayout?: string;
   publicSiteTexts?: PublicSiteTexts;
   publicSiteTheme?: PublicSiteTheme;
+  publicCatalogLayouts?: string[];
+  publicCatalogDefaultLayout?: string;
   customDesignKey?: string | null;
   createdAt: string;
   planTier?: string;
@@ -274,4 +276,5 @@ export interface SignupData {
   password: string;
   name: string;
   companyName: string;
+  language?: "en" | "ru";
 }

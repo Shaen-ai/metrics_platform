@@ -6,16 +6,20 @@ import Image from "next/image";
 import { useStore } from "@/lib/store";
 import { useTranslation } from "@/hooks/useTranslation";
 import { Card, CardContent, Button, Input, ConfirmDialog } from "@/components/ui";
-import { Plus, Search, Edit, Trash2, Package, Box, Loader2 } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Package, Box, Loader2, Crown } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
 import { api } from "@/lib/api";
 import ModelViewerCard from "@/components/ModelViewerCard";
+import { getPricingPageUrl } from "@/lib/billingLinks";
+import { getLandingUrl } from "@/lib/landingUrl";
 
 export default function CatalogPage() {
   const { t } = useTranslation();
   const { catalogItems, fetchCatalogItems, deleteCatalogItem, currentUser } = useStore();
   const [search, setSearch] = useState("");
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const hasActiveSubscription = currentUser?.entitlements?.subscriptionActive === true;
+  const pricingUrl = (getPricingPageUrl() || `${getLandingUrl()}/pricing`).trim();
 
   useEffect(() => { fetchCatalogItems().catch(() => {}); }, []);
 
@@ -81,12 +85,21 @@ export default function CatalogPage() {
           <h1 className="text-2xl font-bold">{t("catalog.title")}</h1>
           <p className="text-[var(--muted-foreground)]">{t("catalog.description")}</p>
         </div>
-        <Button asChild>
-          <Link href="/admin/catalog/new">
-            <Plus className="w-4 h-4 mr-2" />
-            {t("catalog.addItem")}
-          </Link>
-        </Button>
+        {hasActiveSubscription ? (
+          <Button asChild>
+            <Link href="/admin/catalog/new">
+              <Plus className="w-4 h-4 mr-2" />
+              {t("catalog.addItem")}
+            </Link>
+          </Button>
+        ) : (
+          <Button asChild>
+            <a href={pricingUrl} target="_blank" rel="noopener noreferrer">
+              <Crown className="w-4 h-4 mr-2" />
+              {t("catalog.viewPricing")}
+            </a>
+          </Button>
+        )}
       </div>
 
       {/* Search */}
@@ -106,13 +119,26 @@ export default function CatalogPage() {
           <CardContent className="py-12 text-center">
             <Package className="w-12 h-12 mx-auto mb-4 text-[var(--muted-foreground)]" />
             <h3 className="font-medium mb-2">{t("catalog.noItems")}</h3>
-            <p className="text-[var(--muted-foreground)] mb-4">{t("catalog.addFirst")}</p>
-            <Button asChild>
-              <Link href="/admin/catalog/new">
-                <Plus className="w-4 h-4 mr-2" />
-                {t("catalog.addItem")}
-              </Link>
-            </Button>
+            <p className="text-[var(--muted-foreground)] mb-4">
+              {hasActiveSubscription
+                ? t("catalog.addFirst")
+                : t("catalog.subscriptionRequiredBanner")}
+            </p>
+            {hasActiveSubscription ? (
+              <Button asChild>
+                <Link href="/admin/catalog/new">
+                  <Plus className="w-4 h-4 mr-2" />
+                  {t("catalog.addItem")}
+                </Link>
+              </Button>
+            ) : (
+              <Button asChild>
+                <a href={pricingUrl} target="_blank" rel="noopener noreferrer">
+                  <Crown className="w-4 h-4 mr-2" />
+                  {t("catalog.viewPricing")}
+                </a>
+              </Button>
+            )}
           </CardContent>
         </Card>
       ) : (

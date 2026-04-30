@@ -4,6 +4,7 @@ import { useEffect, useCallback, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui";
 import { Box, Sparkles, X, ArrowUpRight, CalendarClock } from "lucide-react";
+import type { PlanEntitlementsSnapshot } from "@/lib/types";
 
 const DEFAULT_PRICING_URL = "/admin/settings";
 
@@ -15,12 +16,19 @@ function pricingHref(): string {
 interface Image3dUpgradeModalProps {
   open: boolean;
   onClose: () => void;
+  reason?: Image3dBlockReason;
 }
+
+export type Image3dBlockReason = "upgrade" | "limit";
 
 /**
  * Shown when Image-to-3D monthly quota is exhausted (API 429 or entitlements at 0).
  */
-export function Image3dUpgradeModal({ open, onClose }: Image3dUpgradeModalProps) {
+export function Image3dUpgradeModal({
+  open,
+  onClose,
+  reason = "limit",
+}: Image3dUpgradeModalProps) {
   const [visible, setVisible] = useState(false);
   const [animating, setAnimating] = useState(false);
 
@@ -59,6 +67,7 @@ export function Image3dUpgradeModal({ open, onClose }: Image3dUpgradeModalProps)
 
   const href = pricingHref();
   const external = /^https?:\/\//i.test(href);
+  const isUpgrade = reason === "upgrade";
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
@@ -109,22 +118,31 @@ export function Image3dUpgradeModal({ open, onClose }: Image3dUpgradeModalProps)
               id="image3d-upgrade-title"
               className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-50"
             >
-              Image-to-3D limit reached
+              {isUpgrade ? "Upgrade to use Image-to-3D" : "Image-to-3D limit reached"}
             </h2>
             <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-              You&apos;ve used all Image-to-3D generations included in your plan for this month. Upgrade
-              to create more 3D models from photos, or try again when your usage resets.
+              {isUpgrade
+                ? "Your current plan does not include Image-to-3D generation. Upgrade to create 3D models from photos."
+                : "You've used all Image-to-3D generations included in your plan for this month. Upgrade to create more 3D models from photos, or try again when your usage resets."}
             </p>
           </div>
 
           <ul className="mb-6 space-y-2.5 rounded-xl border border-violet-100/80 bg-white/60 px-4 py-3 text-left text-sm text-slate-700 dark:border-violet-500/15 dark:bg-violet-950/20 dark:text-slate-300">
             <li className="flex items-start gap-2.5">
               <ArrowUpRight className="mt-0.5 h-4 w-4 shrink-0 text-violet-600 dark:text-violet-400" />
-              <span>Higher monthly Image-to-3D caps on Growth, Scale, and Enterprise.</span>
+              <span>
+                {isUpgrade
+                  ? "Paid plans include monthly Image-to-3D generations."
+                  : "Higher monthly Image-to-3D caps are available on upgraded plans."}
+              </span>
             </li>
             <li className="flex items-start gap-2.5">
               <CalendarClock className="mt-0.5 h-4 w-4 shrink-0 text-violet-600 dark:text-violet-400" />
-              <span>Usage resets at the start of each billing month—your current tier applies until then.</span>
+              <span>
+                {isUpgrade
+                  ? "Once upgraded, your workspace can generate 3D models directly from product photos."
+                  : "Usage resets at the start of each billing month; your current tier applies until then."}
+              </span>
             </li>
           </ul>
 
@@ -155,4 +173,36 @@ export function isImage3dLimitReached(message: string, httpStatus: number): bool
   return (
     m.includes("limit") && (m.includes("plan") || m.includes("month") || m.includes("image-to-3d") || m.includes("3d"))
   ) || m.includes("quota exceeded");
+}
+
+export function getImage3dBlockReason(
+  entitlements?: PlanEntitlementsSnapshot | null,
+): Image3dBlockReason | null {
+  if (!entitlements) return null;
+  if (
+    entitlements.subscriptionActive !== true ||
+    entitlements.planTier === "free" ||
+    entitlements.planTier === "unsubscribed" ||
+    entitlements.image3dMonthlyLimit <= 0
+  ) {
+    return "upgrade";
+  }
+  if (entitlements.image3dRemaining <= 0) return "limit";
+  return null;
+}
+
+export function getImage3dErrorReason(
+  message: string,
+  httpStatus: number,
+): Image3dBlockReason | null {
+  const m = message.toLowerCase();
+  if (
+    httpStatus === 403 ||
+    m.includes("active subscription") ||
+    m.includes("upgrade your plan") ||
+    m.includes("does not include")
+  ) {
+    return "upgrade";
+  }
+  return isImage3dLimitReached(message, httpStatus) ? "limit" : null;
 }

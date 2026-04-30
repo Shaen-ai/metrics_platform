@@ -6,17 +6,18 @@ import { useStore } from "@/lib/store";
 import { useTranslation } from "@/hooks/useTranslation";
 import { Card, CardContent, Button } from "@/components/ui";
 import { ModeIcon } from "@/components/icons/ModeIcons";
+import { LanguagePreferenceButton } from "@/components/LanguagePreferenceButton";
 import { ArrowLeft, Check } from "lucide-react";
 
 export default function SubModesPage() {
   const router = useRouter();
   const params = useParams();
   const { t } = useTranslation();
-  const { modes, currentUser, selectMode, fetchModes } = useStore();
+  const { modes, currentUser, selectMode, fetchModes, updateUser } = useStore();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isSaving, setIsSaving] = useState(false);
 
-  useEffect(() => { fetchModes().catch(() => {}); }, []);
+  useEffect(() => { fetchModes().catch(() => {}); }, [fetchModes]);
 
   const modeSlug = params.modeSlug as string;
   const currentMode = modes.find((m) => m.slug === modeSlug);
@@ -42,6 +43,7 @@ export default function SubModesPage() {
     kitchen: "submodes.kitchen",
     "living-room": "submodes.livingRoom",
     bedroom: "submodes.bedroom",
+    "dining-room": "submodes.diningRoom",
     office: "submodes.office",
     bathroom: "submodes.bathroom",
     outdoor: "submodes.outdoor",
@@ -54,10 +56,6 @@ export default function SubModesPage() {
     "ottomans-poufs": "submodes.ottomansPoufs",
     mattresses: "submodes.mattresses",
     headboards: "submodes.headboards",
-    "interior-doors": "submodes.interiorDoors",
-    "exterior-doors": "submodes.exteriorDoors",
-    windows: "submodes.windows",
-    partitions: "submodes.partitions",
   };
 
   const getSubModeTitle = (subMode: { slug: string; name: string }) => {
@@ -65,11 +63,29 @@ export default function SubModesPage() {
     return key ? t(key) : subMode.name;
   };
 
+  const subModeSlugToDescriptionKey: Record<string, string> = {
+    kitchen: "submodes.kitchenDesc",
+    "living-room": "submodes.livingRoomDesc",
+    bedroom: "submodes.bedroomDesc",
+    "dining-room": "submodes.diningRoomDesc",
+    office: "submodes.officeDesc",
+    outdoor: "submodes.outdoorDesc",
+    "sofas-sectionals": "submodes.sofasSectionalsDesc",
+    "armchairs-recliners": "submodes.armchairsReclinersDesc",
+    "ottomans-poufs": "submodes.ottomansPoufsDesc",
+    mattresses: "submodes.mattressesDesc",
+    headboards: "submodes.headboardsDesc",
+  };
+
+  const getSubModeDescription = (subMode: { slug: string; description: string }) => {
+    const key = subModeSlugToDescriptionKey[subMode.slug];
+    return key ? t(key) : subMode.description;
+  };
+
   const getModeTranslation = (slug: string) => {
     const translations: Record<string, string> = {
       furniture: t("modes.furniture"),
       "soft-furniture": t("modes.softFurniture"),
-      "doors-windows": t("modes.doorsWindows"),
     };
     return translations[slug] || slug;
   };
@@ -89,12 +105,31 @@ export default function SubModesPage() {
   const handleContinue = async () => {
     if (selectedIds.size === 0) return;
     setIsSaving(true);
-    await selectMode(currentMode.id, Array.from(selectedIds));
-    router.push("/admin");
+    try {
+      const currentModeSubIds = new Set(currentMode.subModes.map((sm) => sm.id));
+      const selectedAcrossModes = [
+        ...(currentUser?.selectedSubModeIds?.filter((id) => !currentModeSubIds.has(id)) ?? []),
+        ...Array.from(selectedIds),
+      ];
+      const primaryMode =
+        modes.find((mode) =>
+          mode.subModes.some((subMode) => selectedAcrossModes.includes(subMode.id)),
+        ) ?? currentMode;
+
+      await selectMode(primaryMode.id, selectedAcrossModes);
+      router.push("/admin");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-[var(--background)] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[var(--background)] flex items-center justify-center p-4 relative">
+      <LanguagePreferenceButton
+        fallback={currentUser?.language}
+        onChange={(lang) => void updateUser({ language: lang })}
+        className="absolute right-4 top-4 flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--muted-foreground)] shadow-sm transition-colors hover:border-[var(--primary)] hover:text-[var(--primary)]"
+      />
       <div className="max-w-4xl w-full">
         <Button
           variant="ghost"
@@ -111,18 +146,19 @@ export default function SubModesPage() {
           </div>
           <h1 className="text-3xl font-bold mb-2">{getModeTranslation(currentMode.slug)}</h1>
           <p className="text-[var(--muted-foreground)]">{t("modes.chooseCategory")}</p>
-          <p className="text-sm text-[var(--muted-foreground)] mt-1">
-            Select one or more categories, then press Continue
+          <p className="text-sm text-[var(--muted-foreground)] max-w-2xl mx-auto mt-4 leading-relaxed rounded-xl border border-[var(--border)] bg-[var(--muted)]/30 px-4 py-3 text-left">
+            {t("modes.catalogVsPlannersShort")}
           </p>
+          <p className="text-sm text-[var(--muted-foreground)] mt-3">{t("modes.pickCategoriesHint")}</p>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="flex flex-wrap justify-center gap-4">
           {currentMode.subModes.map((subMode) => {
             const isSelected = selectedIds.has(subMode.id);
             return (
               <Card
                 key={subMode.id}
-                className={`cursor-pointer transition-all group ${
+                className={`w-full sm:w-64 cursor-pointer transition-all group ${
                   isSelected
                     ? "border-[var(--primary)] shadow-lg ring-2 ring-[var(--primary)]/20"
                     : "hover:border-[var(--primary)] hover:shadow-lg"
@@ -147,7 +183,7 @@ export default function SubModesPage() {
                   </div>
                   <h3 className="font-semibold mb-1">{getSubModeTitle(subMode)}</h3>
                   <p className="text-xs text-[var(--muted-foreground)]">
-                    {subMode.description}
+                    {getSubModeDescription(subMode)}
                   </p>
                 </CardContent>
               </Card>
@@ -162,7 +198,7 @@ export default function SubModesPage() {
             isLoading={isSaving}
             className="px-8"
           >
-            Continue with {selectedIds.size} {selectedIds.size === 1 ? "category" : "categories"}
+            {t("modes.continueWithCategories").replace("{count}", String(selectedIds.size))}
           </Button>
         </div>
       </div>

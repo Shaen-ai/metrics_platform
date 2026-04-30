@@ -3,7 +3,7 @@
 import { useEffect, useCallback, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "./Button";
-import { AlertTriangle, X } from "lucide-react";
+import { AlertTriangle, Info, X } from "lucide-react";
 
 interface MessageDialogProps {
   open: boolean;
@@ -12,6 +12,8 @@ interface MessageDialogProps {
   message: string;
   /** @default "OK" */
   confirmText?: string;
+  actionHref?: string;
+  actionText?: string;
   variant?: "warning" | "info";
 }
 
@@ -21,6 +23,8 @@ export function MessageDialog({
   title,
   message,
   confirmText = "OK",
+  actionHref,
+  actionText,
   variant = "warning",
 }: MessageDialogProps) {
   const [visible, setVisible] = useState(false);
@@ -63,6 +67,7 @@ export function MessageDialog({
     warning: "bg-amber-100 text-amber-600",
     info: "bg-blue-100 text-blue-600",
   };
+  const Icon = variant === "info" ? Info : AlertTriangle;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -97,7 +102,7 @@ export function MessageDialog({
               iconColors[variant]
             )}
           >
-            <AlertTriangle className="w-7 h-7" />
+            <Icon className="w-7 h-7" />
           </div>
 
           <h3 className="text-lg font-semibold text-[var(--foreground)] mb-2">
@@ -108,14 +113,23 @@ export function MessageDialog({
             {message}
           </p>
 
-          <Button
-            type="button"
-            variant="primary"
-            className="w-full"
-            onClick={onClose}
-          >
-            {confirmText}
-          </Button>
+          <div className="space-y-2">
+            {actionHref && actionText && (
+              <Button type="button" variant="primary" className="w-full" asChild>
+                <a href={actionHref} target="_blank" rel="noopener noreferrer" onClick={onClose}>
+                  {actionText}
+                </a>
+              </Button>
+            )}
+            <Button
+              type="button"
+              variant={actionHref ? "outline" : "primary"}
+              className="w-full"
+              onClick={onClose}
+            >
+              {confirmText}
+            </Button>
+          </div>
         </div>
       </div>
     </div>

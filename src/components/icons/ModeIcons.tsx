@@ -3,7 +3,6 @@
 import {
   Armchair,
   Sofa,
-  DoorOpen,
   ChefHat,
   Tv,
   Bed,
@@ -12,18 +11,12 @@ import {
   TreePine,
   Square,
   RectangleHorizontal,
-  DoorClosed,
-  PanelLeftClose,
-  SquareStack,
-  Hexagon,
-  LayoutGrid,
   LucideIcon,
 } from "lucide-react";
 
 const iconMap: Record<string, LucideIcon> = {
   Armchair,
   Sofa,
-  DoorOpen,
   ChefHat,
   Tv,
   Bed,
@@ -32,11 +25,6 @@ const iconMap: Record<string, LucideIcon> = {
   TreePine,
   Square,
   RectangleHorizontal,
-  DoorClosed,
-  PanelLeftClose,
-  SquareStack,
-  Hexagon,
-  LayoutGrid,
 };
 
 interface ModeIconProps {
