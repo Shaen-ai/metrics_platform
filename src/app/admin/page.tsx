@@ -121,6 +121,8 @@ export default function AdminDashboard() {
                           ? "bg-green-100 text-green-700"
                           : order.status === "rejected"
                           ? "bg-red-100 text-red-700"
+                          : order.status === "delivered"
+                          ? "bg-emerald-100 text-emerald-800"
                           : "bg-[#FEF3E7] text-[#E8772E]"
                       }`}
                     >

@@ -253,11 +253,12 @@ export interface Order {
   customerName: string;
   customerEmail: string;
   customerPhone?: string;
+  customerAddress?: string;
   type: "catalog" | "module" | "custom";
   items: OrderItem[];
   totalPrice: number;
   currency: string;
-  status: "pending" | "confirmed" | "reviewed" | "quoted" | "accepted" | "rejected";
+  status: "pending" | "confirmed" | "reviewed" | "quoted" | "accepted" | "rejected" | "delivered";
   paymentStatus?: "pending" | "paid" | "failed";
   paypalTransactionId?: string;
   notes?: string;
