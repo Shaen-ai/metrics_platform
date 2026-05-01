@@ -27,7 +27,6 @@ export interface PublicSiteTexts {
   plannersSubtitle?: string;
   materialsTitle?: string;
   materialsSubtitle?: string;
-  footerTagline?: string;
 }
 
 export interface PublicSiteTheme {

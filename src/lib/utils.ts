@@ -47,7 +47,7 @@ export function toRelativeStorageUrl(url: string | undefined): string {
   if (trimmed.startsWith("/")) return trimmed;
   try {
     const u = new URL(trimmed);
-    if (u.pathname.startsWith("/storage/")) {
+    if (u.pathname.startsWith("/storage/") || u.pathname.startsWith("/files/")) {
       return u.pathname + u.search + u.hash;
     }
   } catch {

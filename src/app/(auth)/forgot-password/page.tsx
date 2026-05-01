@@ -3,18 +3,20 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useStore, useHydration } from "@/lib/store";
+import { useStore, useHydration, useRestoreSessionOnMount } from "@/lib/store";
 import { Button, Input, Card, CardHeader, CardTitle, CardContent } from "@/components/ui";
 import { getTranslation } from "@/lib/translations";
 import { useLanguagePreference } from "@/hooks/useLanguagePreference";
 import { LanguagePreferenceButton } from "@/components/LanguagePreferenceButton";
 import { getLandingUrl } from "@/lib/landingUrl";
 import Image from "next/image";
+import { Loader2 } from "lucide-react";
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
   const { forgotPassword, isAuthenticated } = useStore();
   const hydrated = useHydration();
+  useRestoreSessionOnMount();
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [sent, setSent] = useState(false);
@@ -31,7 +33,11 @@ export default function ForgotPasswordPage() {
   }, [hydrated, isAuthenticated, router]);
 
   if (!hydrated || isAuthenticated) {
-    return null;
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#FFF8F0] p-4">
+        <Loader2 className="h-8 w-8 animate-spin text-[#E8772E]" aria-hidden />
+      </div>
+    );
   }
 
   const handleSubmit = async (e: React.FormEvent) => {

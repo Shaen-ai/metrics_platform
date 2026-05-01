@@ -3,19 +3,21 @@
 import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { useStore, useHydration } from "@/lib/store";
+import { useStore, useHydration, useRestoreSessionOnMount } from "@/lib/store";
 import { Button, Input, Card, CardHeader, CardTitle, CardContent } from "@/components/ui";
 import { getTranslation } from "@/lib/translations";
 import { useLanguagePreference } from "@/hooks/useLanguagePreference";
 import { LanguagePreferenceButton } from "@/components/LanguagePreferenceButton";
 import { getLandingUrl } from "@/lib/landingUrl";
 import Image from "next/image";
+import { Loader2 } from "lucide-react";
 
 function ResetPasswordForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { resetPassword, isAuthenticated } = useStore();
   const hydrated = useHydration();
+  useRestoreSessionOnMount();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
@@ -35,7 +37,11 @@ function ResetPasswordForm() {
   }, [hydrated, isAuthenticated, router]);
 
   if (!hydrated || isAuthenticated) {
-    return null;
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#FFF8F0] p-4">
+        <Loader2 className="h-8 w-8 animate-spin text-[#E8772E]" aria-hidden />
+      </div>
+    );
   }
 
   if (!email || !token) {

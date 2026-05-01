@@ -19,6 +19,7 @@ import {
 import { api } from "@/lib/api";
 import { useStore } from "@/lib/store";
 import { toRelativeStorageUrl } from "@/lib/utils";
+import { tuneModelViewerVerticalCenter, type ModelViewerFramingSubset } from "@/lib/modelViewerVerticalCenter";
 import {
   getFirstOversizeFile,
   isFileOverMaxUpload,
@@ -145,6 +146,12 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
+function modelDownloadExtension(url: string): "glb" | "gltf" {
+  const path = url.split(/[?#]/)[0]?.toLowerCase() ?? "";
+
+  return path.endsWith(".gltf") ? "gltf" : "glb";
+}
+
 const Model3DGenerator = forwardRef<Model3DGeneratorHandle | null, Model3DGeneratorProps>(
   function Model3DGenerator(
     {
@@ -170,6 +177,7 @@ const Model3DGenerator = forwardRef<Model3DGeneratorHandle | null, Model3DGenera
   );
   const [jobId, setJobId] = useState<string | null>(currentJobId || null);
   const [error, setError] = useState<string | undefined>();
+  const [downloadError, setDownloadError] = useState<string | undefined>();
   const [modelUrl, setModelUrl] = useState<string | undefined>(
     currentModelUrl ? toRelativeStorageUrl(currentModelUrl) : undefined
   );
@@ -185,6 +193,7 @@ const Model3DGenerator = forwardRef<Model3DGeneratorHandle | null, Model3DGenera
 
   const imgRef = useRef<HTMLInputElement>(null);
   const glbRef = useRef<HTMLInputElement>(null);
+  const modelViewerPreviewRef = useRef<HTMLElement | null>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const meshyInFlight = useRef<Promise<string | null> | null>(null);
 
@@ -193,6 +202,17 @@ const Model3DGenerator = forwardRef<Model3DGeneratorHandle | null, Model3DGenera
       import("@google/model-viewer").then(() => setModelViewerLoaded(true));
     }
   }, [modelViewerLoaded]);
+
+  useEffect(() => {
+    const el = modelViewerPreviewRef.current as ModelViewerFramingSubset | null;
+    if (!el || status !== "done" || !modelUrl || !modelViewerLoaded) return;
+    const onLoad = () => {
+      void tuneModelViewerVerticalCenter(el);
+    };
+    el.addEventListener("load", onLoad);
+    if (el.loaded) onLoad();
+    return () => el.removeEventListener("load", onLoad);
+  }, [status, modelUrl, modelViewerLoaded]);
 
   useEffect(() => {
     return () => {
@@ -390,6 +410,7 @@ const Model3DGenerator = forwardRef<Model3DGeneratorHandle | null, Model3DGenera
     }
     setStatus("uploading");
     setError(undefined);
+    setDownloadError(undefined);
 
     try {
       const filename = `${entityId}.glb`;
@@ -438,15 +459,52 @@ const Model3DGenerator = forwardRef<Model3DGeneratorHandle | null, Model3DGenera
   const handleRetry = () => {
     setStatus("idle");
     setError(undefined);
+    setDownloadError(undefined);
     setJobId(null);
   };
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (!modelUrl) return;
-    const a = document.createElement("a");
-    a.href = modelUrl;
-    a.download = `${entityId}.glb`;
-    a.click();
+
+    try {
+      setDownloadError(undefined);
+      const resolvedUrl = toRelativeStorageUrl(modelUrl);
+      const extension = modelDownloadExtension(resolvedUrl);
+      const res = await fetch(resolvedUrl, { cache: "no-store" });
+      if (!res.ok) {
+        throw new Error(`Download failed (${res.status})`);
+      }
+
+      const contentType = res.headers.get("content-type")?.toLowerCase() ?? "";
+      const arrayBuffer = await res.arrayBuffer();
+      if (arrayBuffer.byteLength === 0) {
+        throw new Error("Downloaded GLB is empty.");
+      }
+      if (
+        contentType.includes("text/html") ||
+        (extension === "glb" && contentType.includes("application/json"))
+      ) {
+        throw new Error("Download returned an error page instead of a model file.");
+      }
+      if (extension === "glb") {
+        const header = new TextDecoder().decode(arrayBuffer.slice(0, 4));
+        if (header !== "glTF") {
+          throw new Error("Downloaded file is not a valid GLB.");
+        }
+      }
+
+      const blob = new Blob([arrayBuffer], {
+        type: extension === "gltf" ? "model/gltf+json" : "model/gltf-binary",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${entityId}.${extension}`;
+      a.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (err) {
+      setDownloadError(err instanceof Error ? err.message : "GLB download failed");
+    }
   };
 
   const isProcessing = status === "queued" || status === "processing" || status === "uploading";
@@ -549,6 +607,9 @@ const Model3DGenerator = forwardRef<Model3DGeneratorHandle | null, Model3DGenera
           <div className="h-72 min-h-[18rem] bg-[var(--muted)] overflow-hidden">
             {modelViewerLoaded ? (
               <model-viewer
+                ref={(node) => {
+                  modelViewerPreviewRef.current = node;
+                }}
                 src={modelUrl}
                 alt="3D Model Preview"
                 camera-controls=""
@@ -583,13 +644,18 @@ const Model3DGenerator = forwardRef<Model3DGeneratorHandle | null, Model3DGenera
             </div>
             <button
               type="button"
-              onClick={handleDownload}
+              onClick={() => void handleDownload()}
               className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--primary)] hover:underline"
             >
               <Download className="w-3.5 h-3.5" />
               Download GLB
             </button>
           </div>
+          {downloadError && (
+            <p className="border-t border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+              {downloadError}
+            </p>
+          )}
         </div>
       )}
 

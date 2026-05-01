@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { Box, Loader2 } from "lucide-react";
 import { toRelativeStorageUrl } from "@/lib/utils";
+import { tuneModelViewerVerticalCenter, type ModelViewerFramingSubset } from "@/lib/modelViewerVerticalCenter";
 
 export default function ModelViewerCard({
   src,
@@ -28,7 +29,7 @@ export default function ModelViewerCard({
       .then(() => {
         if (cancelled || !containerRef.current) return;
 
-        const mv = document.createElement("model-viewer") as HTMLElement;
+        const mv = document.createElement("model-viewer") as ModelViewerFramingSubset;
         mv.setAttribute("src", resolvedSrc);
         mv.setAttribute("alt", alt);
         mv.setAttribute("camera-controls", "");
@@ -53,8 +54,14 @@ export default function ModelViewerCard({
           if (!cancelled) setStatus("failed");
         });
 
+        mv.addEventListener("load", () => {
+          if (!cancelled) {
+            void tuneModelViewerVerticalCenter(mv);
+            setStatus("ready");
+          }
+        });
+
         containerRef.current.appendChild(mv);
-        if (!cancelled) setStatus("ready");
       })
       .catch(() => {
         if (!cancelled) setStatus("failed");

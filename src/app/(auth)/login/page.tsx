@@ -3,13 +3,14 @@
 import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { useStore, useHydration } from "@/lib/store";
+import { useStore, useHydration, useRestoreSessionOnMount } from "@/lib/store";
 import { Button, Input, Card, CardHeader, CardTitle, CardContent } from "@/components/ui";
 import { getTranslation, localizeAuthApiError } from "@/lib/translations";
 import { useLanguagePreference } from "@/hooks/useLanguagePreference";
 import { LanguagePreferenceButton } from "@/components/LanguagePreferenceButton";
 import { getLandingUrl } from "@/lib/landingUrl";
 import Image from "next/image";
+import { Loader2 } from "lucide-react";
 import { safeNextPath } from "@/lib/safeNextPath";
 
 function LoginForm() {
@@ -17,6 +18,7 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const { login, isAuthenticated, currentUser } = useStore();
   const hydrated = useHydration();
+  useRestoreSessionOnMount();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -67,7 +69,11 @@ function LoginForm() {
   }, [hydrated, isAuthenticated, currentUser, router, searchParams]);
 
   if (!hydrated || isAuthenticated) {
-    return null;
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#FFF8F0] p-4">
+        <Loader2 className="h-8 w-8 animate-spin text-[#E8772E]" aria-hidden />
+      </div>
+    );
   }
 
   const handleSubmit = async (e: React.FormEvent) => {

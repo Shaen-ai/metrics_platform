@@ -408,8 +408,10 @@ export const translations: Record<LanguageCode, Record<string, string>> = {
     "settings.plan.unlimited": "Unlimited",
     "settings.plan.viewPricing": "View plans & pricing",
     "settings.plan.manageSubscription": "Manage subscription",
+    "settings.plan.cancelSubscription": "Cancel subscription",
+    "settings.plan.portalError": "Could not open the billing portal. Please contact billing support.",
     "settings.plan.cancelIntro":
-      "To cancel a paid subscription, update payment methods, or change plans, use your billing provider\u2019s portal when linked here, or contact us.",
+      "Canceling opens the secure Stripe billing portal, where you can also update payment methods or change plans.",
     "settings.plan.emailSupport": "Email billing support",
     "settings.plan.tier.free": "No subscription",
     "settings.plan.tier.starter": "Starter",
@@ -911,8 +913,10 @@ export const translations: Record<LanguageCode, Record<string, string>> = {
     "settings.plan.unlimited": "Безлимит",
     "settings.plan.viewPricing": "Тарифы и цены",
     "settings.plan.manageSubscription": "Управлять подпиской",
+    "settings.plan.cancelSubscription": "Отменить подписку",
+    "settings.plan.portalError": "Не удалось открыть портал биллинга. Напишите в поддержку по оплате.",
     "settings.plan.cancelIntro":
-      "Чтобы отменить платную подписку, изменить способ оплаты или сменить тариф, используйте портал биллинга (если подключён) или напишите нам.",
+      "Кнопка откроет защищённый портал Stripe, где можно отменить подписку, изменить способ оплаты или сменить тариф.",
     "settings.plan.emailSupport": "Написать в биллинг",
     "settings.plan.tier.free": "Нет подписки",
     "settings.plan.tier.starter": "Starter",

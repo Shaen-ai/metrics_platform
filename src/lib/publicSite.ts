@@ -74,7 +74,6 @@ export const publicSiteTextFields = [
   { key: "plannersSubtitle", label: "Planners subtitle" },
   { key: "materialsTitle", label: "Materials title" },
   { key: "materialsSubtitle", label: "Materials subtitle" },
-  { key: "footerTagline", label: "Footer tagline" },
 ] as const;
 
 export const DEFAULT_PUBLIC_CATALOG_LAYOUT = "grid";
@@ -84,9 +83,7 @@ export const publicCatalogLayouts = [
   { id: "list", name: "List" },
   { id: "masonry", name: "Masonry" },
   { id: "magazine", name: "Magazine" },
-  { id: "showcase", name: "Showcase" },
   { id: "reels", name: "Reels" },
-  { id: "commerce", name: "Commerce" },
   { id: "gallery", name: "Gallery" },
 ] as const;
 

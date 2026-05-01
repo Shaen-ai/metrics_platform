@@ -791,12 +791,20 @@ export function useHydration() {
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    const unsub = useStore.persist.onFinishHydration(() => setHydrated(true));
     if (useStore.persist.hasHydrated()) {
-      queueMicrotask(() => setHydrated(true));
+      setHydrated(true);
+      return;
     }
-    return () => unsub();
+    return useStore.persist.onFinishHydration(() => setHydrated(true));
   }, []);
 
   return hydrated;
+}
+
+/** Align persisted auth flags with `auth_token` + API (same idea as the home page). */
+export function useRestoreSessionOnMount() {
+  const restoreSession = useStore((s) => s.restoreSession);
+  useEffect(() => {
+    void restoreSession();
+  }, [restoreSession]);
 }

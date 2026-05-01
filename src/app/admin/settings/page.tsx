@@ -138,6 +138,8 @@ function SettingsPageContent() {
   const [publishError, setPublishError] = useState<string | null>(null);
   const [subdomainSaveBusy, setSubdomainSaveBusy] = useState(false);
   const [subdomainSaveError, setSubdomainSaveError] = useState<string | null>(null);
+  const [billingPortalBusy, setBillingPortalBusy] = useState(false);
+  const [billingPortalError, setBillingPortalError] = useState<string | null>(null);
 
   const searchParams = useSearchParams();
   const activeTab = parseSettingsTab(searchParams);
@@ -237,6 +239,35 @@ function SettingsPageContent() {
     onTrial && trialIso
       ? new Date(trialIso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })
       : null;
+
+  const handleOpenBillingPortal = async () => {
+    setBillingPortalError(null);
+
+    if (billingPortalUrl) {
+      window.open(billingPortalUrl, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    const portalTab = window.open("about:blank", "_blank");
+    if (portalTab) {
+      portalTab.opener = null;
+    }
+
+    setBillingPortalBusy(true);
+    try {
+      const { url } = await api.getStripeBillingPortalUrl();
+      if (portalTab) {
+        portalTab.location.href = url;
+      } else {
+        window.open(url, "_blank", "noopener,noreferrer");
+      }
+    } catch (e) {
+      portalTab?.close();
+      setBillingPortalError(e instanceof Error ? e.message : t("settings.plan.portalError"));
+    } finally {
+      setBillingPortalBusy(false);
+    }
+  };
 
   const effectiveLanguage = normalizeLanguageCode(currentUser.language);
   const canUseBrandingAndCopy = currentUser.entitlements?.customTheme === true;
@@ -613,14 +644,18 @@ function SettingsPageContent() {
                 {t("settings.plan.viewPricing")}
               </a>
             </Button>
-            {billingPortalUrl && (
-              <Button asChild>
-                <a href={billingPortalUrl} target="_blank" rel="noopener noreferrer">
-                  {t("settings.plan.manageSubscription")}
-                </a>
+            {hasActiveSubscription && (
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={handleOpenBillingPortal}
+                isLoading={billingPortalBusy}
+              >
+                {t("settings.plan.cancelSubscription")}
               </Button>
             )}
           </div>
+          {billingPortalError && <p className="text-sm text-red-600">{billingPortalError}</p>}
 
           <p className="text-xs leading-relaxed text-[var(--muted-foreground)] border-t border-[var(--border)] pt-4">
             {t("settings.plan.cancelIntro")}

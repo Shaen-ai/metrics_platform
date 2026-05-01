@@ -193,6 +193,13 @@ class ApiClient {
     return { url: data.url };
   }
 
+  async getStripeBillingPortalUrl(): Promise<{ url: string }> {
+    return this.request<{ url: string }>("/billing/portal", {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+  }
+
   async getProfile() {
     return this.request<{ user: unknown }>("/auth/me");
   }
