@@ -55,6 +55,31 @@ function round1(n: number): number {
   return Math.round(n * 10) / 10;
 }
 
+/** Mirror published `wardrobeDrawerBoxCutsCm` (WardrobeInterior3D drawer box). */
+function wardrobeDrawerBoxCutsCm(
+  sectionWidthCm: number,
+  frameDepthCm: number,
+  drawerHeightCm: number,
+): {
+  side: { widthCm: number; heightCm: number };
+  back: { widthCm: number; heightCm: number };
+  bottom: { widthCm: number; heightCm: number; thicknessCm: number };
+} {
+  const boxW_cm = sectionWidthCm - 0.5;
+  const boxD_cm = frameDepthCm - 1.14;
+  const boxH_cm = drawerHeightCm - 0.3;
+  const innerW_cm = Math.max(boxW_cm - 2 * T, 2);
+  return {
+    side: { widthCm: round1(boxD_cm), heightCm: round1(boxH_cm) },
+    back: { widthCm: round1(innerW_cm), heightCm: round1(boxH_cm) },
+    bottom: {
+      widthCm: round1(Math.max(innerW_cm - 0.2, 0.1)),
+      heightCm: round1(Math.max(boxD_cm - 0.2, 0.1)),
+      thicknessCm: 0.3,
+    },
+  };
+}
+
 const FRONT_TYPES = new Set(["drawer", "empty-section"]);
 
 function doorReductionCm(section: WardrobeSection): number {
@@ -181,6 +206,19 @@ export function buildWardrobeLaminateChart(config: WardrobeConfig): LaminateRow[
           note: "Span × depth, shelf thickness = component height",
         });
       }
+      if (comp.type === "shoe-rack") {
+        const rackW = Math.max(0.1, sw - 0.6);
+        const rackD = Math.max(0.1, (D - 2) * 0.6);
+        rows.push({
+          label: `Shoe-rack board — section ${sIdx + 1} #${cIdx + 1}`,
+          widthCm: round1(rackW),
+          heightCm: round1(rackD),
+          thicknessCm: 1,
+          qty: 1,
+          category: "interior",
+          note: "Angled shelf plank (matches 3D shoe-rack board)",
+        });
+      }
       if (comp.type === "drawer") {
         const drawerGapCm = 0.0002 / CM;
         const frontW = sw + T - 2 * drawerGapCm + doorFrontExtraWidthCm(sIdx, sections.length);
@@ -194,6 +232,39 @@ export function buildWardrobeLaminateChart(config: WardrobeConfig): LaminateRow[
           category: "interior",
           note: "Front face (matches 3D)",
         });
+        const box = wardrobeDrawerBoxCutsCm(sw, D, comp.height);
+        if (box.side.widthCm > 0.05 && box.side.heightCm > 0.05) {
+          rows.push({
+            label: `Drawer side — section ${sIdx + 1} #${cIdx + 1}`,
+            widthCm: box.side.widthCm,
+            heightCm: box.side.heightCm,
+            thicknessCm: T,
+            qty: 2,
+            category: "interior",
+            note: "Laminated drawer box wing (matches 3D)",
+          });
+        }
+        if (box.back.widthCm > 0.05 && box.back.heightCm > 0.05) {
+          rows.push({
+            label: `Drawer back — section ${sIdx + 1} #${cIdx + 1}`,
+            widthCm: box.back.widthCm,
+            heightCm: box.back.heightCm,
+            thicknessCm: T,
+            qty: 1,
+            category: "interior",
+          });
+        }
+        if (box.bottom.widthCm > 0.05 && box.bottom.heightCm > 0.05) {
+          rows.push({
+            label: `Drawer bottom — section ${sIdx + 1} #${cIdx + 1}`,
+            widthCm: box.bottom.widthCm,
+            heightCm: box.bottom.heightCm,
+            thicknessCm: box.bottom.thicknessCm,
+            qty: 1,
+            category: "interior",
+            note: "Thin bottom panel in 3D (≈3 mm)",
+          });
+        }
       }
     });
   });

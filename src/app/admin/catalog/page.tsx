@@ -7,7 +7,7 @@ import { useStore } from "@/lib/store";
 import { useTranslation } from "@/hooks/useTranslation";
 import { Card, CardContent, Button, Input, ConfirmDialog } from "@/components/ui";
 import { Plus, Search, Edit, Trash2, Package, Box, Loader2, Crown } from "lucide-react";
-import { formatPrice } from "@/lib/utils";
+import { formatPrice, toRelativeStorageUrl } from "@/lib/utils";
 import { api } from "@/lib/api";
 import ModelViewerCard from "@/components/ModelViewerCard";
 import { getPricingPageUrl } from "@/lib/billingLinks";
@@ -150,14 +150,19 @@ export default function CatalogPage() {
                   <ModelViewerCard
                     src={item.modelUrl}
                     alt={item.name}
-                    fallbackImage={item.images[0]}
+                    fallbackImage={
+                      item.images[0]
+                        ? toRelativeStorageUrl(item.images[0])
+                        : undefined
+                    }
                   />
                 ) : item.images[0] ? (
                   <Image
-                    src={item.images[0]}
+                    src={toRelativeStorageUrl(item.images[0])}
                     alt={item.name}
                     fill
                     className="object-cover"
+                    unoptimized
                   />
                 ) : item.modelStatus === "queued" || item.modelStatus === "processing" ? (
                   <div className="flex flex-col items-center justify-center h-full gap-2">
@@ -175,9 +180,20 @@ export default function CatalogPage() {
                     3D
                   </div>
                 )}
+                {(item.modelStatus === "queued" || item.modelStatus === "processing") && (
+                  <div className="absolute top-2 left-2 px-2 py-1 bg-blue-500 text-white text-xs rounded flex items-center gap-1 pointer-events-none">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    3D
+                  </div>
+                )}
                 {!item.isActive && (
                   <div className="absolute top-2 right-2 px-2 py-1 bg-red-500 text-white text-xs rounded">
                     {t("common.inactive")}
+                  </div>
+                )}
+                {item.forDesign && (
+                  <div className="absolute bottom-2 left-2 px-2 py-1 bg-violet-600 text-white text-xs rounded font-medium">
+                    For Design
                   </div>
                 )}
               </div>

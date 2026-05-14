@@ -9,7 +9,7 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 }
 
 const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ className, label, error, id, ...props }, ref) => {
+  ({ className, label, error, id, onWheel, ...props }, ref) => {
     return (
       <div className="w-full">
         {label && (
@@ -28,6 +28,10 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
             error && "border-[var(--destructive)] focus:ring-[var(--destructive)]",
             className
           )}
+          onWheel={(e) => {
+            if (props.type === "number") (e.target as HTMLInputElement).blur();
+            onWheel?.(e);
+          }}
           {...props}
         />
         {error && (

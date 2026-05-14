@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useStore } from "@/lib/store";
 import { useTranslation } from "@/hooks/useTranslation";
 import {
@@ -43,12 +43,15 @@ import {
   DEFAULT_KERF_MM,
   isSheetedMaterialFromTypes,
 } from "@/lib/sheetSpec";
-import type { Material, MaterialGrainDirection, MaterialTemplate } from "@/lib/types";
+import { BUILDING_MATERIAL_CATEGORY_GROUPS } from "@/lib/buildingMaterialCategories";
+import type { FloorLayoutPattern, Material, MaterialGrainDirection, MaterialTemplate } from "@/lib/types";
 import {
+  MAX_UPLOAD_BYTES,
   isFileOverMaxUpload,
   isLikelyUploadSizeLimitMessage,
   isMaxUploadError,
 } from "@/lib/uploadLimits";
+import { ImageCropDialog } from "@/components/ImageCropDialog";
 
 /** Display order for grouped sections (must include every selectable material type). */
 const MATERIAL_TYPE_ORDER: string[] = [
@@ -61,6 +64,7 @@ const MATERIAL_TYPE_ORDER: string[] = [
   "handle",
   "metal",
   "fabric",
+  "paper",
   "boucle",
   "leather",
   "glass",
@@ -82,6 +86,148 @@ const BRAND_DISPLAY_ORDER: string[] = [
 
 /** Max swatches per brand group before "Show more" (keeps DOM and image requests down). */
 const GROUP_PAGE_SIZE = 20;
+const FLOORING_CATEGORY_PREFIX = "building-flooring-";
+const WALL_CATEGORY_PREFIX = "building-wall-";
+const WALLPAPER_CATEGORY = "building-wall-wallpaper";
+
+/** Sub-modes tied to BUILDING_MATERIAL_CATEGORY_GROUPS — used even when primary `selectedModeId` is another mode */
+const BUILDING_MATERIAL_SUBMODE_IDS = new Set(
+  BUILDING_MATERIAL_CATEGORY_GROUPS.map((g) => g.subModeId),
+);
+
+/** Planner sub-modes under `mode-soft-furniture` (matches `ModeSeeder`). Shown whenever any are enabled. */
+const SOFT_FURNITURE_SUBMODE_IDS = new Set([
+  "sub-sofas",
+  "sub-armchairs",
+  "sub-ottomans",
+  "sub-mattresses",
+  "sub-headboards",
+]);
+
+type MaterialProductChoice = {
+  id: string;
+  labelKey: string;
+  types: string[];
+  categories: string[];
+  unit: string;
+  subModeId?: string;
+  floorLayoutPattern?: FloorLayoutPattern;
+};
+
+type MaterialProductGroup = {
+  id: string;
+  labelKey: string;
+  descriptionKey: string;
+  choices: MaterialProductChoice[];
+};
+
+const FURNITURE_PRODUCT_GROUPS: MaterialProductGroup[] = [
+  {
+    id: "furniture-cabinet",
+    labelKey: "materials.productGroup.furnitureCabinet",
+    descriptionKey: "materials.productGroup.furnitureCabinetDesc",
+    choices: [
+      { id: "cabinet-laminate", labelKey: "material.laminate", types: ["laminate"], categories: ["surface", "door", "frame"], unit: "sqm" },
+      { id: "cabinet-mdf", labelKey: "material.mdf", types: ["mdf"], categories: ["frame", "door", "surface"], unit: "sqm" },
+      { id: "cabinet-wood", labelKey: "material.wood", types: ["wood"], categories: ["frame", "surface", "door"], unit: "sqm" },
+      { id: "cabinet-worktop", labelKey: "material.worktop", types: ["worktop"], categories: ["worktop", "surface"], unit: "sqm" },
+      { id: "cabinet-glass", labelKey: "material.glass", types: ["glass"], categories: ["door", "surface"], unit: "sqm" },
+      { id: "cabinet-metal", labelKey: "material.metal", types: ["metal"], categories: ["frame", "hardware"], unit: "meter" },
+      { id: "cabinet-stone", labelKey: "material.stone", types: ["stone"], categories: ["worktop", "surface"], unit: "sqm" },
+      { id: "cabinet-plastic", labelKey: "material.plastic", types: ["plastic"], categories: ["surface"], unit: "sqm" },
+    ],
+  },
+  {
+    id: "hardware",
+    labelKey: "materials.productGroup.hardware",
+    descriptionKey: "materials.productGroup.hardwareDesc",
+    choices: [
+      { id: "hardware-handle", labelKey: "material.handle", types: ["handle"], categories: ["hardware"], unit: "piece" },
+      { id: "hardware-hinge", labelKey: "material.hinge", types: ["hinge"], categories: ["hardware"], unit: "piece" },
+      { id: "hardware-slide", labelKey: "material.slide", types: ["slide"], categories: ["hardware"], unit: "piece" },
+    ],
+  },
+];
+
+const SOFT_FURNITURE_PRODUCT_GROUPS: MaterialProductGroup[] = [
+  {
+    id: "soft-upholstery",
+    labelKey: "materials.productGroup.softUpholstery",
+    descriptionKey: "materials.productGroup.softUpholsteryDesc",
+    choices: [
+      { id: "soft-fabric", labelKey: "material.fabric", types: ["fabric"], categories: ["upholstery", "finish"], unit: "sqm" },
+      { id: "soft-boucle", labelKey: "material.boucle", types: ["boucle"], categories: ["upholstery", "finish"], unit: "sqm" },
+      { id: "soft-leather", labelKey: "material.leather", types: ["leather"], categories: ["upholstery", "finish"], unit: "sqm" },
+      { id: "soft-wood", labelKey: "material.wood", types: ["wood"], categories: ["frame"], unit: "sqm" },
+      { id: "soft-metal", labelKey: "material.metal", types: ["metal"], categories: ["frame"], unit: "meter" },
+    ],
+  },
+];
+
+function buildingProductDefaults(value: string): Pick<MaterialProductChoice, "types" | "categories" | "unit" | "floorLayoutPattern"> {
+  if (value.startsWith("building-door-")) {
+    const type = value.includes("mdf")
+      ? "mdf"
+      : value.includes("laminate")
+        ? "laminate"
+        : value.includes("metal") || value.includes("security")
+          ? "metal"
+          : "wood";
+    return { types: [type], categories: [value, "door"], unit: "piece" };
+  }
+
+  if (value.startsWith("building-window-") || value.startsWith("building-glass-") || value === "building-balcony-door") {
+    const type = value.includes("pvc")
+      ? "plastic"
+      : value.includes("aluminum")
+        ? "metal"
+        : value.includes("wood")
+          ? "wood"
+          : "glass";
+    return { types: [type], categories: [value], unit: "piece" };
+  }
+
+  if (value.startsWith("building-flooring-")) {
+    const type =
+      value.includes("laminate")
+        ? "laminate"
+        : value.includes("parquet") || value.includes("hardwood")
+          ? "wood"
+          : value.includes("vinyl")
+            ? "plastic"
+            : value.includes("ceramic") || value.includes("porcelain")
+              ? "stone"
+              : "plastic";
+    return {
+      types: [type],
+      categories: [value, "floor", "finish"],
+      unit: "sqm",
+      floorLayoutPattern: "aligned",
+    };
+  }
+
+  if (value.startsWith("building-wall-")) {
+    const type = value.includes("wallpaper")
+      ? "paper"
+      : value.includes("wood")
+        ? "wood"
+        : value.includes("tiles")
+          ? "stone"
+          : "plastic";
+    return { types: [type], categories: [value, "finish"], unit: value.includes("wallpaper") ? "roll" : "sqm" };
+  }
+
+  if (value.startsWith("building-ceiling-")) {
+    const type = value.includes("stretch")
+      ? "fabric"
+      : value.includes("suspended")
+        ? "metal"
+        : "plastic";
+    return { types: [type], categories: [value, "finish"], unit: "sqm" };
+  }
+
+  return { types: ["plastic"], categories: [value], unit: "sqm" };
+}
 
 function sortManufacturerSlugs(slugs: string[]): string[] {
   const orderIdx = new Map(BRAND_DISPLAY_ORDER.map((k, i) => [k, i]));
@@ -174,8 +320,9 @@ export default function MaterialsPage() {
     name: "",
     types: ["laminate"] as string[],
     categories: [] as string[],
+    subModeId: "",
     color: "",
-    colorCode: "#000000",
+    colorCode: "",
     price: "",
     currency: currentUser?.currency || "AMD",
     unit: "sqm",
@@ -186,6 +333,11 @@ export default function MaterialsPage() {
     sheetHeightCm: "",
     grainDirection: "along_width" as MaterialGrainDirection,
     kerfMm: "",
+    textureWidthCm: "",
+    textureHeightCm: "",
+    productWidthCm: "",
+    productHeightCm: "",
+    floorLayoutPattern: "aligned" as FloorLayoutPattern,
   });
 
   /** Tabs for the image source selector in the form. */
@@ -195,9 +347,13 @@ export default function MaterialsPage() {
   const [uploadTooLargeOpen, setUploadTooLargeOpen] = useState(false);
   /** Yellow/non-blocking warnings about the provided image (resolution / aspect). */
   const [imageWarnings, setImageWarnings] = useState<string[]>([]);
+  const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
+  const [cropFile, setCropFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [materialFormError, setMaterialFormError] = useState<string | null>(null);
+  const [advancedClassificationOpen, setAdvancedClassificationOpen] = useState(false);
 
   const [selectedMaterialIds, setSelectedMaterialIds] = useState<string[]>([]);
   const [bulkPrice, setBulkPrice] = useState("");
@@ -222,7 +378,7 @@ export default function MaterialsPage() {
   /** Visible decor count per manufacturer within the catalog grid. */
   const [catalogBrandVisibleCount, setCatalogBrandVisibleCount] = useState<Record<string, number>>({});
 
-  const materialTypes = [
+  const materialTypes = useMemo(() => [
     { value: "laminate", label: t("material.laminate") },
     { value: "mdf", label: t("material.mdf") },
     { value: "wood", label: t("material.wood") },
@@ -232,14 +388,15 @@ export default function MaterialsPage() {
     { value: "handle", label: t("material.handle") },
     { value: "metal", label: t("material.metal") },
     { value: "fabric", label: t("material.fabric") },
+    { value: "paper", label: t("material.paper") },
     { value: "boucle", label: t("material.boucle") },
     { value: "leather", label: t("material.leather") },
     { value: "glass", label: t("material.glass") },
     { value: "plastic", label: t("material.plastic") },
     { value: "stone", label: t("material.stone") },
-  ];
+  ], [t]);
 
-  const materialCategories = [
+  const materialCategories = useMemo(() => [
     { value: "frame", label: t("material.frame") },
     { value: "surface", label: t("material.surface") },
     { value: "door", label: t("material.door") },
@@ -248,14 +405,177 @@ export default function MaterialsPage() {
     { value: "finish", label: t("material.finish") },
     { value: "worktop", label: t("material.worktop") },
     { value: "domus", label: t("material.domus") },
-  ];
+  ], [t]);
+
+  const categoryLabel = useCallback((slug: string): string => {
+    for (const g of BUILDING_MATERIAL_CATEGORY_GROUPS) {
+      const it = g.items.find((i) => i.value === slug);
+      if (it) return t(it.labelKey);
+    }
+    return materialCategories.find((c) => c.value === slug)?.label ?? slug;
+  }, [materialCategories, t]);
 
   const units = [
     { value: "sqm", label: t("unit.sqm") },
     { value: "meter", label: t("unit.meter") },
     { value: "piece", label: t("unit.piece") },
+    { value: "roll", label: t("unit.roll") },
+    { value: "box", label: t("unit.box") },
     { value: "kg", label: t("unit.kg") },
   ];
+
+  const selectedModeIdForProducts =
+    currentUser?.selectedModeId?.trim() || modes[0]?.id || "mode-furniture";
+  const selectedSubModeIds = useMemo(
+    () => currentUser?.selectedSubModeIds ?? [],
+    [currentUser?.selectedSubModeIds],
+  );
+  const selectedSubModeIdSet = useMemo(
+    () => new Set(selectedSubModeIds),
+    [selectedSubModeIds],
+  );
+  const selectedMode = modes.find((m) => m.id === selectedModeIdForProducts);
+  const selectedModeSubModeIds = selectedMode?.subModes.map((sm) => sm.id) ?? [];
+  const fallbackSubModeId = selectedSubModeIds[0] ?? selectedModeSubModeIds[0] ?? "";
+
+  const visibleProductGroups = useMemo<MaterialProductGroup[]>(() => {
+    const mapBuildingCategoriesToGroups = (): MaterialProductGroup[] => {
+      const hasSubModeFilter = selectedSubModeIdSet.size > 0;
+      return BUILDING_MATERIAL_CATEGORY_GROUPS
+        .filter((group) => !hasSubModeFilter || selectedSubModeIdSet.has(group.subModeId))
+        .map((group) => ({
+          id: group.subModeId,
+          labelKey: group.groupLabelKey,
+          descriptionKey: "materials.productGroup.buildingDesc",
+          choices: group.items.map((item) => ({
+            id: item.value,
+            labelKey: item.labelKey,
+            subModeId: group.subModeId,
+            ...buildingProductDefaults(item.value),
+          })),
+        }));
+    };
+
+    const groups: MaterialProductGroup[] = [];
+
+    const mapSoftProductGroups = (): MaterialProductGroup[] => {
+      const softSub =
+        selectedSubModeIds.find((id) => SOFT_FURNITURE_SUBMODE_IDS.has(id)) ||
+        fallbackSubModeId ||
+        "";
+      return SOFT_FURNITURE_PRODUCT_GROUPS.map((group) => ({
+        ...group,
+        choices: group.choices.map((choice) => ({
+          ...choice,
+          subModeId: softSub || undefined,
+        })),
+      }));
+    };
+
+    if (selectedModeIdForProducts === "mode-furniture") {
+      groups.push(
+        ...FURNITURE_PRODUCT_GROUPS.map((group) => ({
+          ...group,
+          choices: group.choices.map((choice) => ({
+            ...choice,
+            subModeId: fallbackSubModeId || undefined,
+          })),
+        })),
+      );
+    }
+
+    const wantsSoftFurnitureProductRows = [...selectedSubModeIdSet].some((id) =>
+      SOFT_FURNITURE_SUBMODE_IDS.has(id),
+    );
+    if (selectedModeIdForProducts === "mode-soft-furniture" || wantsSoftFurnitureProductRows) {
+      groups.push(...mapSoftProductGroups());
+    }
+
+    if (selectedModeIdForProducts === "mode-building-materials") {
+      groups.push(...mapBuildingCategoriesToGroups());
+    }
+
+    /**
+     * `selectMode` sets `selectedModeId` to the first mode in the API list that has any
+     * selected sub-mode. Merchants often enable mixed sub-categories; then primary mode
+     * may stay `mode-furniture` while soft-furniture or building sub-modes are also on.
+     * Merge in building product rows whenever a building-material sub-mode is enabled.
+     * Merge in soft-furniture product rows whenever a soft-furniture sub-mode is enabled.
+     */
+    const wantsBuildingProductRows = [...selectedSubModeIdSet].some((id) =>
+      BUILDING_MATERIAL_SUBMODE_IDS.has(id),
+    );
+    if (wantsBuildingProductRows && selectedModeIdForProducts !== "mode-building-materials") {
+      groups.push(...mapBuildingCategoriesToGroups());
+    }
+
+    return groups;
+  }, [fallbackSubModeId, selectedModeIdForProducts, selectedSubModeIdSet, selectedSubModeIds]);
+
+  const selectedProductChoice = useMemo(() => {
+    for (const group of visibleProductGroups) {
+      const choice = group.choices.find((item) =>
+        item.types.every((type) => formData.types.includes(type)) &&
+        item.categories.every((category) => formData.categories.includes(category)),
+      );
+      if (choice) return choice;
+    }
+    return null;
+  }, [formData.categories, formData.types, visibleProductGroups]);
+
+  const selectedProductLabel = selectedProductChoice ? t(selectedProductChoice.labelKey) : "";
+
+  const internalTypeSummary = useMemo(
+    () =>
+      formData.types
+        .map((type) => materialTypes.find((opt) => opt.value === type)?.label ?? type)
+        .join(", "),
+    [formData.types, materialTypes],
+  );
+
+  const internalCategorySummary = useMemo(
+    () => formData.categories.map((category) => categoryLabel(category)).join(", "),
+    [categoryLabel, formData.categories],
+  );
+
+  const overrideCategoryOptions = useMemo(() => {
+    const allBuildingItems = BUILDING_MATERIAL_CATEGORY_GROUPS.flatMap((group) => group.items);
+    const relevantCategoryValues = new Set<string>();
+    for (const group of visibleProductGroups) {
+      for (const choice of group.choices) {
+        for (const category of choice.categories) relevantCategoryValues.add(category);
+      }
+    }
+    for (const category of formData.categories) relevantCategoryValues.add(category);
+
+    const byValue = new Map<string, { value: string; label: string }>();
+    for (const category of materialCategories) {
+      byValue.set(category.value, category);
+    }
+    for (const item of allBuildingItems) {
+      if (relevantCategoryValues.has(item.value)) {
+        byValue.set(item.value, { value: item.value, label: t(item.labelKey) });
+      }
+    }
+    for (const category of formData.categories) {
+      if (!byValue.has(category)) {
+        byValue.set(category, { value: category, label: categoryLabel(category) });
+      }
+    }
+
+    return Array.from(byValue.values());
+  }, [categoryLabel, formData.categories, materialCategories, t, visibleProductGroups]);
+
+  const applyProductChoice = (choice: MaterialProductChoice) => {
+    setFormData((p) => ({
+      ...p,
+      types: choice.types,
+      categories: choice.categories,
+      unit: choice.unit,
+      subModeId: choice.subModeId ?? fallbackSubModeId,
+      floorLayoutPattern: choice.floorLayoutPattern ?? p.floorLayoutPattern,
+    }));
+  };
 
   useEffect(() => {
     void fetchMaterials();
@@ -319,7 +639,7 @@ export default function MaterialsPage() {
       m.type.toLowerCase().includes(q) ||
       typeQ.includes(q) ||
       catStr.includes(q) ||
-      m.color.toLowerCase().includes(q)
+      (m.color || "").toLowerCase().includes(q)
     );
   });
 
@@ -408,6 +728,73 @@ export default function MaterialsPage() {
   const brandSectionLabel = (brandKey: string) =>
     brandKey === "__custom__" ? t("materials.brandCustom") : mfrLabel(brandKey);
 
+  const hasFloorMaterialCategory = formData.categories.some(
+    (category) => category.startsWith(FLOORING_CATEGORY_PREFIX) || category === "floor",
+  );
+  const hasWallMaterialCategory = formData.categories.some((category) =>
+    category.startsWith(WALL_CATEGORY_PREFIX),
+  );
+  const hasWallpaperCategory = formData.categories.includes(WALLPAPER_CATEGORY);
+  const hasPlannerPhysicalSizeCategory = hasFloorMaterialCategory || hasWallMaterialCategory;
+  const physicalSizeCopy = hasWallpaperCategory
+    ? {
+        title: "Texture repeat size",
+        description:
+          "Optional. Enter the real area represented by one wallpaper image repeat. This keeps the texture scale correct in the planner, not the uploaded image pixel size.",
+        widthLabel: "Image repeat width (cm)",
+        heightLabel: "Image repeat height (cm)",
+        widthPlaceholder: "e.g. 53",
+        heightPlaceholder: "e.g. 100",
+      }
+    : hasWallMaterialCategory
+      ? {
+          title: "Texture repeat size",
+          description:
+            "Optional. Enter the real tile, panel, or texture repeat size represented by the image. This is used only for planner texture scale.",
+          widthLabel: "Image repeat width (cm)",
+          heightLabel: "Image repeat height (cm)",
+          widthPlaceholder: "e.g. 30",
+          heightPlaceholder: "e.g. 60",
+        }
+      : {
+          title: "Texture repeat size",
+          description:
+            "Optional. Enter the real plank, tile, board, or texture repeat size represented by the image. This is used only for planner texture scale.",
+          widthLabel: "Image repeat width (cm)",
+          heightLabel: "Image repeat height (cm)",
+          widthPlaceholder: "e.g. 20",
+          heightPlaceholder: "e.g. 120",
+        };
+  const productSizeCopy = hasWallpaperCategory
+    ? {
+        title: "Sellable roll size / coverage",
+        description:
+          "Optional. Enter the actual wallpaper roll coverage sold for the entered price. The published planner uses this to calculate roll count and total price.",
+        widthLabel: "Roll width (cm)",
+        heightLabel: "Roll length (cm)",
+        widthPlaceholder: "e.g. 53",
+        heightPlaceholder: "e.g. 1000",
+      }
+    : hasWallMaterialCategory
+      ? {
+          title: "Sellable item size / coverage",
+          description:
+            "Optional. Enter the actual panel, tile pack, or item coverage sold for the entered price. The published planner uses this for item count and total price.",
+          widthLabel: "Item/pack width (cm)",
+          heightLabel: "Item/pack height (cm)",
+          widthPlaceholder: "e.g. 30",
+          heightPlaceholder: "e.g. 60",
+        }
+      : {
+          title: "Sellable item size / coverage",
+          description:
+            "Optional. Enter the actual board, tile pack, laminate box, or item coverage sold for the entered price. The published planner uses this for item count and total price.",
+          widthLabel: "Item/pack width (cm)",
+          heightLabel: "Item/pack length (cm)",
+          widthPlaceholder: "e.g. 120",
+          heightPlaceholder: "e.g. 200",
+        };
+
   const getGroupVisible = (typeKey: string, brandKey: string, total: number) => {
     const k = groupKey(typeKey, brandKey);
     return Math.min(groupVisibleCount[k] ?? GROUP_PAGE_SIZE, total);
@@ -431,13 +818,18 @@ export default function MaterialsPage() {
     }));
   };
 
+  const resolvedModeIdForMaterial =
+    currentUser?.selectedModeId?.trim() || modes[0]?.id || "";
+
   const resetForm = () => {
+    setMaterialFormError(null);
     setFormData({
       name: "",
       types: ["laminate"],
       categories: [],
+      subModeId: "",
       color: "",
-      colorCode: "#000000",
+      colorCode: "",
       price: "",
       currency: currentUser?.currency || "AMD",
       unit: "sqm",
@@ -446,11 +838,18 @@ export default function MaterialsPage() {
       sheetHeightCm: "",
       grainDirection: "along_width",
       kerfMm: "",
+      textureWidthCm: "",
+      textureHeightCm: "",
+      productWidthCm: "",
+      productHeightCm: "",
+      floorLayoutPattern: "aligned",
     });
     setImageSourceTab("url");
     setImageUploading(false);
     setImageError(null);
     setImageWarnings([]);
+    setImageDimensions(null);
+    setAdvancedClassificationOpen(false);
     setEditingId(null);
     setShowForm(false);
   };
@@ -461,8 +860,9 @@ export default function MaterialsPage() {
       types: material.types?.length ? [...material.types] : [material.type],
       categories:
         material.categories?.length ? [...material.categories] : [material.category],
-      color: material.color,
-      colorCode: material.colorCode,
+      subModeId: material.subModeId ?? "",
+      color: material.color || "",
+      colorCode: material.colorCode || "",
       price: material.price.toString(),
       currency: material.currency,
       unit: material.unit,
@@ -480,17 +880,43 @@ export default function MaterialsPage() {
         material.kerfMm !== undefined && material.kerfMm !== null
           ? String(material.kerfMm)
           : "",
+      textureWidthCm:
+        material.textureWidthCm !== undefined && material.textureWidthCm !== null
+          ? String(material.textureWidthCm)
+          : "",
+      textureHeightCm:
+        material.textureHeightCm !== undefined && material.textureHeightCm !== null
+          ? String(material.textureHeightCm)
+          : "",
+      productWidthCm:
+        material.productWidthCm !== undefined && material.productWidthCm !== null
+          ? String(material.productWidthCm)
+          : "",
+      productHeightCm:
+        material.productHeightCm !== undefined && material.productHeightCm !== null
+          ? String(material.productHeightCm)
+          : "",
+      floorLayoutPattern: material.floorLayoutPattern ?? "aligned",
     });
     setImageSourceTab(material.imageUrl ? "url" : "url");
     setImageError(null);
     setImageWarnings([]);
+    setImageDimensions(null);
+    setAdvancedClassificationOpen(false);
     setEditingId(material.id);
     setShowForm(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setMaterialFormError(null);
     if (formData.categories.length === 0 || formData.types.length === 0) return;
+
+    if (!resolvedModeIdForMaterial) {
+      setMaterialFormError(t("materials.modeRequiredForMaterial"));
+      return;
+    }
+
     const price = parseFloat(formData.price) || 0;
 
     // Sheet fields only apply when any selected type is sheet stock;
@@ -503,16 +929,23 @@ export default function MaterialsPage() {
       const n = Number(trimmed);
       return Number.isFinite(n) && n > 0 ? n : undefined;
     };
+    const parseTextureOpt = (s: string): number | null => {
+      const trimmed = s.trim();
+      if (trimmed === "") return null;
+      const n = Number(trimmed);
+      return Number.isFinite(n) && n > 0 ? n : null;
+    };
 
     const data = {
-      name: formData.name,
+      name: formData.name.trim(),
       type: formData.types[0],
       types: formData.types,
       categories: formData.categories,
       category: formData.categories[0] ?? "",
-      color: formData.color,
-      colorCode: formData.colorCode,
-      colorHex: formData.colorCode,
+      subModeId: formData.subModeId || fallbackSubModeId || undefined,
+      color: formData.color.trim(),
+      colorCode: formData.colorCode.trim(),
+      colorHex: formData.colorCode.trim(),
       price,
       pricePerUnit: price,
       currency: formData.currency,
@@ -522,7 +955,20 @@ export default function MaterialsPage() {
       sheetHeightCm: parseOpt(formData.sheetHeightCm),
       grainDirection: sheeted ? formData.grainDirection : undefined,
       kerfMm: parseOpt(formData.kerfMm),
-      modeId: currentUser?.selectedModeId || "",
+      textureWidthCm: hasPlannerPhysicalSizeCategory
+        ? parseTextureOpt(formData.textureWidthCm)
+        : null,
+      textureHeightCm: hasPlannerPhysicalSizeCategory
+        ? parseTextureOpt(formData.textureHeightCm)
+        : null,
+      productWidthCm: hasPlannerPhysicalSizeCategory
+        ? parseTextureOpt(formData.productWidthCm)
+        : null,
+      productHeightCm: hasPlannerPhysicalSizeCategory
+        ? parseTextureOpt(formData.productHeightCm)
+        : null,
+      floorLayoutPattern: hasFloorMaterialCategory ? formData.floorLayoutPattern : null,
+      modeId: resolvedModeIdForMaterial,
       isActive: true,
     };
 
@@ -535,6 +981,8 @@ export default function MaterialsPage() {
       resetForm();
     } catch (err) {
       console.error(err);
+      const msg = err instanceof Error ? err.message : "";
+      setMaterialFormError(msg || t("materials.saveFailed"));
     }
   };
 
@@ -546,12 +994,14 @@ export default function MaterialsPage() {
   const probeImageQuality = (url: string) => {
     if (!url) {
       setImageWarnings([]);
+      setImageDimensions(null);
       return;
     }
     if (typeof window === "undefined") return;
     const img = new window.Image();
     img.crossOrigin = "anonymous";
     img.onload = () => {
+      setImageDimensions({ width: img.naturalWidth, height: img.naturalHeight });
       const notes: string[] = [];
       if (isSheetedMaterialFromTypes(formData.types)) {
         const sheetW =
@@ -583,7 +1033,10 @@ export default function MaterialsPage() {
       }
       setImageWarnings(notes);
     };
-    img.onerror = () => setImageWarnings([]);
+    img.onerror = () => {
+      setImageWarnings([]);
+      setImageDimensions(null);
+    };
     img.src = url;
   };
 
@@ -608,6 +1061,11 @@ export default function MaterialsPage() {
     } finally {
       setImageUploading(false);
     }
+  };
+
+  const handleImageSelectedForCrop = (file: File) => {
+    setImageError(null);
+    setCropFile(file);
   };
 
   const handleDelete = (id: string) => {
@@ -724,7 +1182,7 @@ export default function MaterialsPage() {
       {showForm && (
         <div className="fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-black/50">
           <div className="min-h-[100dvh] flex items-center justify-center p-4 box-border">
-            <Card className="w-full max-w-md max-h-[min(90dvh,calc(100dvh-2rem))] overflow-y-auto overflow-x-hidden">
+            <Card className="w-full max-w-2xl max-h-[min(90dvh,calc(100dvh-2rem))] overflow-y-auto overflow-x-hidden">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>
                 {editingId ? t("materials.editMaterial") : t("materials.addMaterial")}
@@ -735,6 +1193,11 @@ export default function MaterialsPage() {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-4">
+                {materialFormError && (
+                  <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
+                    {materialFormError}
+                  </p>
+                )}
                 <Input
                   label={t("catalog.itemName")}
                   value={formData.name}
@@ -742,89 +1205,240 @@ export default function MaterialsPage() {
                   required
                 />
 
-                <fieldset>
-                  <legend className="block text-sm font-medium mb-1.5">{t("materials.type")}</legend>
-                  <p className="text-xs text-[var(--muted-foreground)] mb-2">{t("materials.typesHint")}</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {materialTypes.map((opt) => {
-                      const checked = formData.types.includes(opt.value);
-                      return (
-                        <label
-                          key={opt.value}
-                          className="inline-flex items-center gap-2 rounded-lg border border-[var(--input)] px-3 py-2 cursor-pointer has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[var(--ring)]"
-                        >
-                          <input
-                            type="checkbox"
-                            className="rounded border-[var(--input)]"
-                            checked={checked}
-                            onChange={() => {
-                              setFormData((p) => {
-                                const next = checked
-                                  ? p.types.filter((t) => t !== opt.value)
-                                  : [...p.types, opt.value];
-                                if (next.length === 0) return p;
-                                const onlyHardware =
-                                  next.length > 0 &&
-                                  next.every((t) => t === "slide" || t === "hinge");
-                                return {
-                                  ...p,
-                                  types: next,
-                                  unit: onlyHardware ? "piece" : p.unit,
-                                };
-                              });
-                            }}
-                          />
-                          <span className="text-sm">{opt.label}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                  {formData.types.length === 0 && (
-                    <p className="text-xs text-amber-600 dark:text-amber-500 mt-2">
-                      {t("materials.selectAtLeastOneType")}
+                <fieldset className="rounded-lg border border-[var(--border)] p-3 space-y-3">
+                  <legend className="px-2 text-sm font-medium">
+                    {t("materials.productGroup.title")}
+                  </legend>
+                  <p className="text-xs text-[var(--muted-foreground)]">
+                    {t("materials.productGroup.hint")}
+                  </p>
+
+                  {visibleProductGroups.length === 0 ? (
+                    <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+                      {t("materials.productGroup.noneForMode")}
                     </p>
+                  ) : (
+                    <div className="space-y-4">
+                      {visibleProductGroups.map((group) => (
+                        <div key={group.id}>
+                          <div className="mb-2">
+                            <div className="text-sm font-semibold">{t(group.labelKey)}</div>
+                            <div className="text-xs text-[var(--muted-foreground)]">
+                              {t(group.descriptionKey)}
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {group.choices.map((choice) => {
+                              const checked =
+                                choice.types.every((type) => formData.types.includes(type)) &&
+                                choice.categories.every((category) =>
+                                  formData.categories.includes(category),
+                                );
+                              return (
+                                <label
+                                  key={choice.id}
+                                  className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 cursor-pointer has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[var(--ring)] ${
+                                    checked
+                                      ? "border-[var(--primary)] bg-[var(--accent)]"
+                                      : "border-[var(--input)]"
+                                  }`}
+                                >
+                                  <input
+                                    type="radio"
+                                    name="material-product-choice"
+                                    className="border-[var(--input)]"
+                                    checked={checked}
+                                    onChange={() => applyProductChoice(choice)}
+                                  />
+                                  <span className="text-sm">{t(choice.labelKey)}</span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   )}
+
+                  <div className="rounded-md bg-[var(--accent)] px-3 py-2 text-xs text-[var(--muted-foreground)]">
+                    {selectedProductLabel ? (
+                      <>
+                        {t("materials.productGroup.selected")}{" "}
+                        <span className="font-medium text-[var(--foreground)]">
+                          {selectedProductLabel}
+                        </span>
+                      </>
+                    ) : (
+                      t("materials.productGroup.selectOne")
+                    )}
+                  </div>
                 </fieldset>
 
-                <fieldset>
-                  <legend className="block text-sm font-medium mb-2">
-                    {t("materials.categories")}
-                  </legend>
-                  <p className="text-xs text-[var(--muted-foreground)] mb-2">
-                    {t("materials.categoriesHint")}
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {materialCategories.map((cat) => {
-                      const checked = formData.categories.includes(cat.value);
-                      return (
-                        <label
-                          key={cat.value}
-                          className="inline-flex items-center gap-2 rounded-lg border border-[var(--input)] px-3 py-2 cursor-pointer has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[var(--ring)]"
-                        >
-                          <input
-                            type="checkbox"
-                            className="rounded border-[var(--input)]"
-                            checked={checked}
-                            onChange={() => {
-                              setFormData((p) => {
-                                const next = checked
-                                  ? p.categories.filter((c) => c !== cat.value)
-                                  : [...p.categories, cat.value];
-                                return { ...p, categories: next };
-                              });
-                            }}
-                          />
-                          <span className="text-sm">{cat.label}</span>
-                        </label>
-                      );
-                    })}
+                <section className="rounded-lg border border-[var(--border)] p-3 space-y-3">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <h3 className="text-sm font-medium">
+                        {t("materials.internalClassification")}
+                      </h3>
+                      <p className="mt-1 text-xs text-[var(--muted-foreground)]">
+                        {t("materials.internalClassificationHint")}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="self-start text-xs font-medium text-[var(--primary)] hover:underline"
+                      onClick={() => setAdvancedClassificationOpen((open) => !open)}
+                    >
+                      {advancedClassificationOpen
+                        ? t("materials.hideInternalTags")
+                        : t("materials.editInternalTags")}
+                    </button>
                   </div>
-                  {formData.categories.length === 0 && (
-                    <p className="text-xs text-amber-600 dark:text-amber-500 mt-2">
-                      {t("materials.selectAtLeastOneCategory")}
-                    </p>
+
+                  <dl className="grid grid-cols-1 gap-2 rounded-md bg-[var(--accent)]/50 p-3 text-xs sm:grid-cols-2">
+                    <div>
+                      <dt className="text-[var(--muted-foreground)]">
+                        {t("materials.internalProduct")}
+                      </dt>
+                      <dd className="font-medium text-[var(--foreground)]">
+                        {selectedProductLabel || t("materials.productGroup.selectOne")}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-[var(--muted-foreground)]">
+                        {t("materials.internalType")}
+                      </dt>
+                      <dd className="font-medium text-[var(--foreground)]">
+                        {internalTypeSummary || "—"}
+                      </dd>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <dt className="text-[var(--muted-foreground)]">
+                        {t("materials.internalTags")}
+                      </dt>
+                      <dd className="font-medium text-[var(--foreground)]">
+                        {internalCategorySummary || "—"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-[var(--muted-foreground)]">
+                        {t("materials.unit")}
+                      </dt>
+                      <dd className="font-medium text-[var(--foreground)]">
+                        {units.find((unit) => unit.value === formData.unit)?.label ?? formData.unit}
+                      </dd>
+                    </div>
+                  </dl>
+
+                  {advancedClassificationOpen && (
+                    <div className="space-y-4 rounded-lg border border-amber-200 bg-amber-50/70 p-3 dark:border-amber-900 dark:bg-amber-950/20">
+                      <p className="text-xs text-amber-800 dark:text-amber-200">
+                        {t("materials.internalOverrideWarning")}
+                      </p>
+
+                      {selectedModeSubModeIds.length > 0 && (
+                        <div>
+                          <label className="block text-sm font-medium mb-1.5">
+                            {t("materials.internalSubMode")}
+                          </label>
+                          <select
+                            value={formData.subModeId || fallbackSubModeId}
+                            onChange={(e) =>
+                              setFormData((p) => ({ ...p, subModeId: e.target.value }))
+                            }
+                            className="w-full h-10 px-3 rounded-lg border border-[var(--input)] bg-[var(--background)]"
+                          >
+                            {selectedMode?.subModes.map((subMode) => (
+                              <option key={subMode.id} value={subMode.id}>
+                                {subMode.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      <fieldset>
+                        <legend className="block text-sm font-medium mb-1.5">
+                          {t("materials.type")}
+                        </legend>
+                        <div className="flex flex-wrap gap-2">
+                          {materialTypes.map((opt) => {
+                            const checked = formData.types.includes(opt.value);
+                            return (
+                              <label
+                                key={opt.value}
+                                className="inline-flex items-center gap-2 rounded-lg border border-[var(--input)] bg-[var(--background)] px-3 py-2 cursor-pointer has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[var(--ring)]"
+                              >
+                                <input
+                                  type="checkbox"
+                                  className="rounded border-[var(--input)]"
+                                  checked={checked}
+                                  onChange={() => {
+                                    setFormData((p) => {
+                                      const next = checked
+                                        ? p.types.filter((type) => type !== opt.value)
+                                        : [...p.types, opt.value];
+                                      if (next.length === 0) return p;
+                                      const onlyHardware = next.every(
+                                        (type) =>
+                                          type === "slide" ||
+                                          type === "hinge" ||
+                                          type === "handle",
+                                      );
+                                      return {
+                                        ...p,
+                                        types: next,
+                                        unit: onlyHardware ? "piece" : p.unit,
+                                      };
+                                    });
+                                  }}
+                                />
+                                <span className="text-sm">{opt.label}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </fieldset>
+
+                      <fieldset>
+                        <legend className="block text-sm font-medium mb-1.5">
+                          {t("materials.internalTags")}
+                        </legend>
+                        <div className="flex flex-wrap gap-2">
+                          {overrideCategoryOptions.map((cat) => {
+                            const checked = formData.categories.includes(cat.value);
+                            return (
+                              <label
+                                key={cat.value}
+                                className="inline-flex items-center gap-2 rounded-lg border border-[var(--input)] bg-[var(--background)] px-3 py-2 cursor-pointer has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[var(--ring)]"
+                              >
+                                <input
+                                  type="checkbox"
+                                  className="rounded border-[var(--input)]"
+                                  checked={checked}
+                                  onChange={() => {
+                                    setFormData((p) => {
+                                      const next = checked
+                                        ? p.categories.filter((category) => category !== cat.value)
+                                        : [...p.categories, cat.value];
+                                      return { ...p, categories: next };
+                                    });
+                                  }}
+                                />
+                                <span className="text-sm">{cat.label}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                        {formData.categories.length === 0 && (
+                          <p className="text-xs text-amber-700 dark:text-amber-300 mt-2">
+                            {t("materials.selectAtLeastOneCategory")}
+                          </p>
+                        )}
+                      </fieldset>
+                    </div>
                   )}
-                </fieldset>
+                </section>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Input
@@ -832,17 +1446,12 @@ export default function MaterialsPage() {
                     value={formData.color}
                     onChange={(e) => setFormData((p) => ({ ...p, color: e.target.value }))}
                   />
-                  <div>
-                    <label className="block text-sm font-medium mb-1.5">
-                      {t("materials.colorCode")}
-                    </label>
-                    <input
-                      type="color"
-                      value={formData.colorCode}
-                      onChange={(e) => setFormData((p) => ({ ...p, colorCode: e.target.value }))}
-                      className="w-full h-10 rounded-lg border border-[var(--input)]"
-                    />
-                  </div>
+                  <Input
+                    label={t("materials.colorCode")}
+                    placeholder="#000000"
+                    value={formData.colorCode}
+                    onChange={(e) => setFormData((p) => ({ ...p, colorCode: e.target.value }))}
+                  />
                 </div>
 
                 <div>
@@ -885,7 +1494,7 @@ export default function MaterialsPage() {
                         className="hidden"
                         onChange={(e) => {
                           const f = e.target.files?.[0];
-                          if (f) void handleImageUpload(f);
+                          if (f) handleImageSelectedForCrop(f);
                           e.target.value = "";
                         }}
                       />
@@ -898,7 +1507,7 @@ export default function MaterialsPage() {
                         <span className="text-sm text-[var(--muted-foreground)]">
                           {imageUploading
                             ? "Uploading…"
-                            : "Click to upload (JPG / PNG / WebP, up to 10 MB)"}
+                            : "Click to upload (JPG / PNG / WebP) — crop first; export must fit within the upload limit."}
                         </span>
                       </div>
                       {imageError && (
@@ -930,9 +1539,14 @@ export default function MaterialsPage() {
                           onLoad={() => probeImageQuality(formData.imageUrl)}
                         />
                       </div>
-                      <p className="text-xs text-[var(--muted-foreground)] break-all flex-1">
-                        {formData.imageUrl}
-                      </p>
+                      <div className="text-xs text-[var(--muted-foreground)] break-all flex-1 space-y-1">
+                        <p>{formData.imageUrl}</p>
+                        {imageDimensions && (
+                          <p>
+                            Image pixel size: {imageDimensions.width} x {imageDimensions.height} px
+                          </p>
+                        )}
+                      </div>
                     </div>
                   )}
 
@@ -957,8 +1571,8 @@ export default function MaterialsPage() {
                       Sheet size & grain
                     </legend>
                     <p className="text-xs text-[var(--muted-foreground)]">
-                      Used by the planner to virtually cut this material into cabinet
-                      pieces. Leave blank to use the default
+                      Physical stock sheet used for cabinet cutting, not the uploaded
+                      image size and not wallpaper/tile dimensions. Leave blank to use the default
                       {` ${DEFAULT_SHEET_WIDTH_CM} × ${DEFAULT_SHEET_HEIGHT_CM} cm`}.
                     </p>
                     <div className="grid grid-cols-2 gap-3">
@@ -1023,6 +1637,100 @@ export default function MaterialsPage() {
                         value={formData.kerfMm}
                         onChange={(e) =>
                           setFormData((p) => ({ ...p, kerfMm: e.target.value }))
+                        }
+                      />
+                    </div>
+                  </fieldset>
+                )}
+
+                {hasPlannerPhysicalSizeCategory && (
+                  <fieldset className="rounded-lg border border-[var(--border)] p-3 space-y-3">
+                    <legend className="px-2 text-sm font-medium">
+                      {physicalSizeCopy.title}
+                    </legend>
+                    <p className="text-xs text-[var(--muted-foreground)]">
+                      {physicalSizeCopy.description}
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <Input
+                        label={physicalSizeCopy.widthLabel}
+                        type="number"
+                        step="0.1"
+                        min="1"
+                        max="5000"
+                        placeholder={physicalSizeCopy.widthPlaceholder}
+                        value={formData.textureWidthCm}
+                        onChange={(e) =>
+                          setFormData((p) => ({ ...p, textureWidthCm: e.target.value }))
+                        }
+                      />
+                      <Input
+                        label={physicalSizeCopy.heightLabel}
+                        type="number"
+                        step="0.1"
+                        min="1"
+                        max="5000"
+                        placeholder={physicalSizeCopy.heightPlaceholder}
+                        value={formData.textureHeightCm}
+                        onChange={(e) =>
+                          setFormData((p) => ({ ...p, textureHeightCm: e.target.value }))
+                        }
+                      />
+                      {hasFloorMaterialCategory && (
+                        <div>
+                          <label className="block text-sm font-medium mb-1.5">
+                            Default floor layout
+                          </label>
+                          <select
+                            value={formData.floorLayoutPattern}
+                            onChange={(e) =>
+                              setFormData((p) => ({
+                                ...p,
+                                floorLayoutPattern: e.target.value as FloorLayoutPattern,
+                              }))
+                            }
+                            className="w-full h-10 px-3 rounded-lg border border-[var(--input)] bg-[var(--background)]"
+                          >
+                            <option value="aligned">Aligned grid</option>
+                            <option value="staggered">Staggered joints</option>
+                          </select>
+                        </div>
+                      )}
+                    </div>
+                  </fieldset>
+                )}
+
+                {hasPlannerPhysicalSizeCategory && (
+                  <fieldset className="rounded-lg border border-[var(--border)] p-3 space-y-3">
+                    <legend className="px-2 text-sm font-medium">
+                      {productSizeCopy.title}
+                    </legend>
+                    <p className="text-xs text-[var(--muted-foreground)]">
+                      {productSizeCopy.description}
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <Input
+                        label={productSizeCopy.widthLabel}
+                        type="number"
+                        step="0.1"
+                        min="1"
+                        max="5000"
+                        placeholder={productSizeCopy.widthPlaceholder}
+                        value={formData.productWidthCm}
+                        onChange={(e) =>
+                          setFormData((p) => ({ ...p, productWidthCm: e.target.value }))
+                        }
+                      />
+                      <Input
+                        label={productSizeCopy.heightLabel}
+                        type="number"
+                        step="0.1"
+                        min="1"
+                        max="5000"
+                        placeholder={productSizeCopy.heightPlaceholder}
+                        value={formData.productHeightCm}
+                        onChange={(e) =>
+                          setFormData((p) => ({ ...p, productHeightCm: e.target.value }))
                         }
                       />
                     </div>
@@ -1169,7 +1877,7 @@ export default function MaterialsPage() {
                                   </button>
                                   <div
                                     className="w-12 h-12 rounded-lg border border-[var(--border)] overflow-hidden flex-shrink-0 bg-[var(--muted)]"
-                                    style={{ backgroundColor: material.colorCode }}
+                                    style={{ backgroundColor: material.colorCode || undefined }}
                                   >
                                     {material.imageUrl && (
                                       <img
@@ -1202,11 +1910,7 @@ export default function MaterialsPage() {
                                         ? material.categories
                                         : [material.category]
                                       )
-                                        .map(
-                                          (slug) =>
-                                            materialCategories.find((c) => c.value === slug)
-                                              ?.label ?? slug,
-                                        )
+                                        .map((slug) => categoryLabel(slug))
                                         .join(", ")}{" "}
                                       • {material.color}
                                     </p>
@@ -1710,6 +2414,19 @@ export default function MaterialsPage() {
         confirmText={t("common.delete")}
         cancelText={t("common.cancel")}
         variant="danger"
+      />
+      <ImageCropDialog
+        open={Boolean(cropFile)}
+        files={cropFile ? [cropFile] : []}
+        title="Crop material image"
+        maxOutputBytes={MAX_UPLOAD_BYTES}
+        onOutputTooLarge={() => setUploadTooLargeOpen(true)}
+        onCancel={() => setCropFile(null)}
+        onApply={(files) => {
+          setCropFile(null);
+          const file = files[0];
+          if (file) void handleImageUpload(file);
+        }}
       />
     </div>
   );

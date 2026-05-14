@@ -22,11 +22,12 @@ import { api } from "@/lib/api";
 import { MODULE_HANDLES } from "@/lib/moduleHandles";
 import type { Module } from "@/lib/types";
 import {
-  getFirstOversizeFile,
-  isFileOverMaxUpload,
+  MAX_UPLOAD_BYTES,
   isLikelyUploadSizeLimitMessage,
   isMaxUploadError,
+  isModelFileOverMaxUpload,
 } from "@/lib/uploadLimits";
+import { ImageCropDialog } from "@/components/ImageCropDialog";
 
 function module3dListBadges(m: Module) {
   const st = m.modelStatus;
@@ -91,6 +92,7 @@ export default function ModulesPage() {
   const [hasNewImageFor3dJob, setHasNewImageFor3dJob] = useState(false);
   const [aiImages, setAiImages] = useState<File[]>([]);
   const [aiImagePreviews, setAiImagePreviews] = useState<string[]>([]);
+  const [cropFiles, setCropFiles] = useState<File[] | null>(null);
   const [texturePrompt, setTexturePrompt] = useState("");
   const [dragOver, setDragOver] = useState(false);
   const glbRef = useRef<HTMLInputElement>(null);
@@ -206,10 +208,19 @@ export default function ModulesPage() {
     if (imgRef.current) imgRef.current.value = "";
   };
 
+  const setAiImageFiles = (files: File[]) => {
+    aiImagePreviews.forEach((u) => URL.revokeObjectURL(u));
+    setAiImages(files);
+    setAiImagePreviews(files.map((f) => URL.createObjectURL(f)));
+    setGlbFile(null);
+    setTexturePrompt("");
+    setHasNewImageFor3dJob(files.length > 0);
+  };
+
   const handleGlbSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (isFileOverMaxUpload(file)) {
+      if (isModelFileOverMaxUpload(file)) {
         setUploadTooLargeOpen(true);
         if (glbRef.current) glbRef.current.value = "";
         return;
@@ -225,18 +236,7 @@ export default function ModulesPage() {
       .filter((f) => f.type.startsWith("image/"))
       .slice(0, 4);
     if (files.length === 0) return;
-    const over = getFirstOversizeFile(files);
-    if (over) {
-      setUploadTooLargeOpen(true);
-      if (imgRef.current) imgRef.current.value = "";
-      return;
-    }
-    aiImagePreviews.forEach((u) => URL.revokeObjectURL(u));
-    setAiImages(files);
-    setAiImagePreviews(files.map((f) => URL.createObjectURL(f)));
-    setGlbFile(null);
-    setTexturePrompt("");
-    setHasNewImageFor3dJob(true);
+    setCropFiles(files);
     if (imgRef.current) imgRef.current.value = "";
   };
 
@@ -259,24 +259,14 @@ export default function ModulesPage() {
     const imgs = files.filter((f) => f.type.startsWith("image/")).slice(0, 4);
     if (glbs.length > 0) {
       const g = glbs[0];
-      if (isFileOverMaxUpload(g)) {
+      if (isModelFileOverMaxUpload(g)) {
         setUploadTooLargeOpen(true);
         return;
       }
       setGlbFile(g);
       clearAiImages();
     } else if (imgs.length > 0) {
-      const over = getFirstOversizeFile(imgs);
-      if (over) {
-        setUploadTooLargeOpen(true);
-        return;
-      }
-      aiImagePreviews.forEach((u) => URL.revokeObjectURL(u));
-      setAiImages(imgs);
-      setAiImagePreviews(imgs.map((f) => URL.createObjectURL(f)));
-      setGlbFile(null);
-      setTexturePrompt("");
-      setHasNewImageFor3dJob(true);
+      setCropFiles(imgs);
     }
   };
 
@@ -1305,6 +1295,18 @@ export default function ModulesPage() {
         confirmText={t("common.delete")}
         cancelText={t("common.cancel")}
         variant="danger"
+      />
+      <ImageCropDialog
+        open={Boolean(cropFiles)}
+        files={cropFiles ?? []}
+        title="Crop AI reference images"
+        maxOutputBytes={MAX_UPLOAD_BYTES}
+        onOutputTooLarge={() => setUploadTooLargeOpen(true)}
+        onCancel={() => setCropFiles(null)}
+        onApply={(files) => {
+          setCropFiles(null);
+          setAiImageFiles(files.slice(0, 4));
+        }}
       />
     </div>
   );

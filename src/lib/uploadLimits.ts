@@ -2,6 +2,11 @@ export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 
 export const MAX_UPLOAD_LABEL = "10 MB";
 
+/** GLB/GLTF uploads (`upload-model`); images stay at {@link MAX_UPLOAD_BYTES}. */
+export const MAX_MODEL_UPLOAD_BYTES = 50 * 1024 * 1024;
+
+export const MAX_MODEL_UPLOAD_LABEL = "50 MB";
+
 export class MaxUploadError extends Error {
   constructor(message = "MAX_UPLOAD") {
     super(message);
@@ -11,6 +16,10 @@ export class MaxUploadError extends Error {
 
 export function isFileOverMaxUpload(file: { size: number }): boolean {
   return file.size > MAX_UPLOAD_BYTES;
+}
+
+export function isModelFileOverMaxUpload(file: { size: number }): boolean {
+  return file.size > MAX_MODEL_UPLOAD_BYTES;
 }
 
 export function isMaxUploadError(err: unknown): err is MaxUploadError {
@@ -28,10 +37,20 @@ export function isLikelyUploadSizeLimitMessage(msg: string): boolean {
   const m = msg.toLowerCase();
   if (m.includes("maxupload") || m.includes("max_upload")) return true;
   if (m.includes("10240") && m.includes("kilo")) return true;
+  if (m.includes("20480") && m.includes("kilo")) return true;
+  if (m.includes("51200") && m.includes("kilo")) return true;
   if (m.includes("upload_max_filesize") || m.includes("post_max_size")) return true;
   if (m.includes("php limit") || m.includes("ini_size") || m.includes("form_size"))
     return true;
-  if (m.includes("file must be under 10") || m.includes("under 10mb")) return true;
+  if (
+    m.includes("file must be under 10") ||
+    m.includes("under 10mb") ||
+    m.includes("file must be under 20") ||
+    m.includes("under 20mb") ||
+    m.includes("file must be under 50") ||
+    m.includes("under 50mb")
+  )
+    return true;
   return false;
 }
 

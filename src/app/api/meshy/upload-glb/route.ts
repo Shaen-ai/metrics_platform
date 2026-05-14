@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { MAX_MODEL_UPLOAD_BYTES, MAX_MODEL_UPLOAD_LABEL } from "@/lib/uploadLimits";
 import { getPublicApiUrl } from "@/lib/publicEnv";
 
 
@@ -28,10 +29,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const MAX_SIZE = 10 * 1024 * 1024;
-    if (file.size > MAX_SIZE) {
+    if (file.size > MAX_MODEL_UPLOAD_BYTES) {
       return NextResponse.json(
-        { error: "File must be under 10MB" },
+        { error: `File must be ${MAX_MODEL_UPLOAD_LABEL} or smaller` },
         { status: 413 }
       );
     }

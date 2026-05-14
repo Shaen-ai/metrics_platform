@@ -1,5 +1,6 @@
 import {
   isFileOverMaxUpload,
+  isModelFileOverMaxUpload,
   MaxUploadError,
 } from "./uploadLimits";
 import { publicApiUrl } from "./publicEnv";
@@ -321,7 +322,7 @@ class ApiClient {
   }
 
   async uploadModel(file: File | Blob, filename: string): Promise<{ url: string }> {
-    if (isFileOverMaxUpload(file)) {
+    if (isModelFileOverMaxUpload(file)) {
       throw new MaxUploadError();
     }
     const formData = new FormData();
@@ -364,6 +365,18 @@ class ApiClient {
       throw new Error("Upload did not return a URL");
     }
     return { url: data.url };
+  }
+
+  async sendErrorReport(payload: {
+    message: string;
+    screenshot?: string | null;
+    url?: string;
+    userAgent?: string;
+  }) {
+    return this.request<{ ok: boolean }>("/error-report", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
   }
 
   // Catalog Items

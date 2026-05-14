@@ -320,6 +320,12 @@ export const useStore = create<AppState>()(
           payload.public_catalog_default_layout = updates.publicCatalogDefaultLayout;
         }
         if (updates.customDesignKey !== undefined) payload.custom_design_key = updates.customDesignKey;
+        if (updates.interiorDesignCatalogCoverage !== undefined) {
+          payload.interior_design_catalog_coverage_mode =
+            updates.interiorDesignCatalogCoverage.mode;
+          payload.interior_design_catalog_coverage_value =
+            updates.interiorDesignCatalogCoverage.value;
+        }
 
         const res = await api.updateProfile(payload);
         set({ currentUser: normalizeUserFromApi(res.user as User) });
@@ -388,6 +394,29 @@ export const useStore = create<AppState>()(
             .map((s) => s.trim());
           if (ac.length > 0) payload.additional_categories = ac;
         }
+        if (item.plannerSubcategory !== undefined && item.plannerSubcategory !== null) {
+          const ps = String(item.plannerSubcategory).trim();
+          if (ps !== "") payload.planner_subcategory = ps;
+        }
+        if (item.supportsOutdoorCushions !== undefined) {
+          payload.supports_outdoor_cushions = item.supportsOutdoorCushions;
+        }
+        if (item.outdoorCushionDefaults !== undefined) {
+          payload.outdoor_cushion_defaults = item.outdoorCushionDefaults;
+        }
+        if (item.isFabricCustomizable !== undefined) {
+          payload.is_fabric_customizable = item.isFabricCustomizable;
+        }
+        if (item.fabricParts !== undefined) {
+          payload.fabric_parts = item.fabricParts;
+        }
+        if (item.forDesign !== undefined) payload.for_design = item.forDesign;
+        if (item.surfaceTextureWidthCm !== undefined) payload.surface_texture_width_cm = item.surfaceTextureWidthCm;
+        if (item.surfaceTextureHeightCm !== undefined) payload.surface_texture_height_cm = item.surfaceTextureHeightCm;
+        if (item.surfaceItemWidthCm !== undefined) payload.surface_item_width_cm = item.surfaceItemWidthCm;
+        if (item.surfaceItemHeightCm !== undefined) payload.surface_item_height_cm = item.surfaceItemHeightCm;
+        if (item.surfaceLayoutPattern !== undefined) payload.surface_layout_pattern = item.surfaceLayoutPattern;
+        if (item.unit !== undefined) payload.unit = item.unit;
         const res = await api.createCatalogItem(payload);
         const newItem = res.data as CatalogItem;
         set((s) => ({ catalogItems: [newItem, ...s.catalogItems] }));
@@ -416,6 +445,14 @@ export const useStore = create<AppState>()(
             .filter((s) => typeof s === "string" && s.trim() !== "")
             .map((s) => s.trim());
         }
+        if (updates.plannerSubcategory !== undefined) {
+          if (updates.plannerSubcategory === null) {
+            payload.planner_subcategory = null;
+          } else {
+            const v = String(updates.plannerSubcategory).trim();
+            payload.planner_subcategory = v === "" ? null : v;
+          }
+        }
         if (updates.isActive !== undefined) payload.is_active = updates.isActive;
         if (updates.images !== undefined) payload.images = updates.images;
         if (updates.availableColors !== undefined) {
@@ -425,6 +462,25 @@ export const useStore = create<AppState>()(
         if (updates.modelJobId !== undefined) payload.model_job_id = updates.modelJobId;
         if (updates.modelStatus !== undefined) payload.model_status = updates.modelStatus;
         if (updates.modelError !== undefined) payload.model_error = updates.modelError;
+        if (updates.supportsOutdoorCushions !== undefined) {
+          payload.supports_outdoor_cushions = updates.supportsOutdoorCushions;
+        }
+        if (updates.outdoorCushionDefaults !== undefined) {
+          payload.outdoor_cushion_defaults = updates.outdoorCushionDefaults;
+        }
+        if (updates.isFabricCustomizable !== undefined) {
+          payload.is_fabric_customizable = updates.isFabricCustomizable;
+        }
+        if (updates.fabricParts !== undefined) {
+          payload.fabric_parts = updates.fabricParts;
+        }
+        if (updates.forDesign !== undefined) payload.for_design = updates.forDesign;
+        if (updates.surfaceTextureWidthCm !== undefined) payload.surface_texture_width_cm = updates.surfaceTextureWidthCm;
+        if (updates.surfaceTextureHeightCm !== undefined) payload.surface_texture_height_cm = updates.surfaceTextureHeightCm;
+        if (updates.surfaceItemWidthCm !== undefined) payload.surface_item_width_cm = updates.surfaceItemWidthCm;
+        if (updates.surfaceItemHeightCm !== undefined) payload.surface_item_height_cm = updates.surfaceItemHeightCm;
+        if (updates.surfaceLayoutPattern !== undefined) payload.surface_layout_pattern = updates.surfaceLayoutPattern;
+        if (updates.unit !== undefined) payload.unit = updates.unit;
 
         const res = await api.updateCatalogItem(id, payload);
         const updated = res.data as CatalogItem;
@@ -482,6 +538,11 @@ export const useStore = create<AppState>()(
           sheet_height_cm: material.sheetHeightCm ?? null,
           grain_direction: material.grainDirection ?? null,
           kerf_mm: material.kerfMm ?? null,
+          texture_width_cm: material.textureWidthCm ?? null,
+          texture_height_cm: material.textureHeightCm ?? null,
+          product_width_cm: material.productWidthCm ?? null,
+          product_height_cm: material.productHeightCm ?? null,
+          floor_layout_pattern: material.floorLayoutPattern ?? null,
           is_active: material.isActive,
         };
         const res = await api.createMaterial(payload);
@@ -493,6 +554,8 @@ export const useStore = create<AppState>()(
       updateMaterial: async (id, updates) => {
         const payload: Record<string, unknown> = {};
         if (updates.name !== undefined) payload.name = updates.name;
+        if (updates.modeId !== undefined) payload.mode_id = updates.modeId;
+        if (updates.subModeId !== undefined) payload.sub_mode_id = updates.subModeId || null;
         if (updates.type !== undefined) payload.type = updates.type;
         if (updates.types !== undefined) payload.types = updates.types;
         if (updates.categories !== undefined) payload.categories = updates.categories;
@@ -512,6 +575,16 @@ export const useStore = create<AppState>()(
         if (updates.grainDirection !== undefined)
           payload.grain_direction = updates.grainDirection;
         if (updates.kerfMm !== undefined) payload.kerf_mm = updates.kerfMm;
+        if (updates.textureWidthCm !== undefined)
+          payload.texture_width_cm = updates.textureWidthCm;
+        if (updates.textureHeightCm !== undefined)
+          payload.texture_height_cm = updates.textureHeightCm;
+        if (updates.productWidthCm !== undefined)
+          payload.product_width_cm = updates.productWidthCm;
+        if (updates.productHeightCm !== undefined)
+          payload.product_height_cm = updates.productHeightCm;
+        if (updates.floorLayoutPattern !== undefined)
+          payload.floor_layout_pattern = updates.floorLayoutPattern;
         if (updates.isActive !== undefined) payload.is_active = updates.isActive;
 
         const res = await api.updateMaterial(id, payload);
@@ -788,15 +861,14 @@ export const useStore = create<AppState>()(
 );
 
 export function useHydration() {
-  const [hydrated, setHydrated] = useState(false);
+  const [hydrated, setHydrated] = useState(
+    () => typeof window !== "undefined" && useStore.persist.hasHydrated()
+  );
 
   useEffect(() => {
-    if (useStore.persist.hasHydrated()) {
-      setHydrated(true);
-      return;
-    }
+    if (hydrated) return;
     return useStore.persist.onFinishHydration(() => setHydrated(true));
-  }, []);
+  }, [hydrated]);
 
   return hydrated;
 }

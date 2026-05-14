@@ -18,6 +18,7 @@ import {
   Palette,
   Upload,
   Loader2,
+  Sparkles,
 } from "lucide-react";
 import { languages, normalizeLanguageCode } from "@/lib/translations";
 import { setStoredLanguagePreference } from "@/lib/languagePreference";
@@ -131,6 +132,11 @@ function SettingsPageContent() {
   const [catalogModeSaving, setCatalogModeSaving] = useState(false);
   const [catalogModeSaved, setCatalogModeSaved] = useState(false);
 
+  const [interiorCovMode, setInteriorCovMode] = useState<"percent" | "count">("percent");
+  const [interiorCovValue, setInteriorCovValue] = useState(50);
+  const [interiorCovSaving, setInteriorCovSaving] = useState(false);
+  const [interiorCovSaved, setInteriorCovSaved] = useState(false);
+
   const [subdomainDraft, setSubdomainDraft] = useState("");
   const [subdomainAvail, setSubdomainAvail] = useState<"idle" | "checking" | "yes" | "no">("idle");
   const [copiedPublished, setCopiedPublished] = useState(false);
@@ -168,6 +174,16 @@ function SettingsPageContent() {
   useEffect(() => {
     setCustomCatalogOnly(currentUser?.useCustomPlannerCatalog === true);
   }, [currentUser?.useCustomPlannerCatalog]);
+
+  useEffect(() => {
+    const c = currentUser?.interiorDesignCatalogCoverage;
+    setInteriorCovMode(c?.mode === "count" ? "count" : "percent");
+    if (typeof c?.value === "number" && Number.isFinite(c.value)) {
+      setInteriorCovValue(c.value);
+      return;
+    }
+    setInteriorCovValue(c?.mode === "count" ? 4 : 50);
+  }, [currentUser?.interiorDesignCatalogCoverage]);
 
   useEffect(() => {
     setSiteLayout(currentUser?.publicSiteLayout || DEFAULT_PUBLIC_SITE_LAYOUT);
@@ -631,6 +647,14 @@ function SettingsPageContent() {
                     {ent.aiChatMonthlyLimit == null
                       ? t("settings.plan.unlimited")
                       : `${ent.aiChatRemaining ?? 0} / ${ent.aiChatMonthlyLimit}`}
+                  </span>
+                </li>
+                <li className="flex justify-between gap-4">
+                  <span className="text-[var(--muted-foreground)]">{t("settings.plan.interiorDesign")}</span>
+                  <span className="font-medium tabular-nums text-right">
+                    {typeof ent.interiorDesignMonthlyLimit === "number"
+                      ? `${ent.interiorDesignRemaining ?? 0} / ${ent.interiorDesignMonthlyLimit}`
+                      : t("settings.plan.unlimited")}
                   </span>
                 </li>
               </ul>
@@ -1303,6 +1327,92 @@ function SettingsPageContent() {
               </>
             ) : (
               t("settings.savePlannerFurniture")
+            )}
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Sparkles className="w-5 h-5" />
+            {t("settings.interiorAiCatalogTitle")}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-[var(--muted-foreground)]">{t("settings.interiorAiCatalogDesc")}</p>
+          <div className="space-y-3">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="radio"
+                name="interior-ai-catalog-policy"
+                className="mt-1"
+                checked={interiorCovMode === "percent"}
+                onChange={() => setInteriorCovMode("percent")}
+              />
+              <span className="text-sm">{t("settings.interiorAiCatalogModePercent")}</span>
+            </label>
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="radio"
+                name="interior-ai-catalog-policy"
+                className="mt-1"
+                checked={interiorCovMode === "count"}
+                onChange={() => setInteriorCovMode("count")}
+              />
+              <span className="text-sm">{t("settings.interiorAiCatalogModeCount")}</span>
+            </label>
+          </div>
+          <div className="space-y-1">
+            <Input
+              id="interior-ai-catalog-value"
+              type="number"
+              label={interiorCovMode === "percent" ? "%" : "SKUs"}
+              value={String(Number.isFinite(interiorCovValue) ? interiorCovValue : 1)}
+              onChange={(e) => {
+                const n = Math.floor(Number(e.target.value));
+                setInteriorCovValue(Number.isFinite(n) ? n : 1);
+              }}
+              min={1}
+              max={interiorCovMode === "percent" ? 100 : 120}
+            />
+            <p className="text-xs text-[var(--muted-foreground)]">
+              {interiorCovMode === "percent"
+                ? t("settings.interiorAiCatalogPercentHint")
+                : t("settings.interiorAiCatalogCountHint")}
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            isLoading={interiorCovSaving}
+            onClick={async () => {
+              setInteriorCovSaving(true);
+              try {
+                let raw = Math.floor(Number(interiorCovValue));
+                if (!Number.isFinite(raw)) raw = interiorCovMode === "percent" ? 50 : 4;
+                if (interiorCovMode === "percent") raw = Math.min(100, Math.max(1, raw));
+                else raw = Math.min(120, Math.max(1, raw));
+                await updateUser({
+                  interiorDesignCatalogCoverage: {
+                    mode: interiorCovMode,
+                    value: raw,
+                  },
+                });
+                setInteriorCovValue(raw);
+                setInteriorCovSaved(true);
+                setTimeout(() => setInteriorCovSaved(false), 2000);
+              } finally {
+                setInteriorCovSaving(false);
+              }
+            }}
+          >
+            {interiorCovSaved ? (
+              <>
+                <Check className="w-4 h-4 mr-2" />
+                {t("settings.interiorAiCatalogSaved")}
+              </>
+            ) : (
+              t("settings.saveInteriorAiCatalog")
             )}
           </Button>
         </CardContent>

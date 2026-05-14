@@ -10,6 +10,9 @@ export interface PlanEntitlementsSnapshot {
   aiChatRemaining: number | null;
   image3dMonthlyLimit: number;
   image3dRemaining: number;
+  /** null monthly limit = unlimited (e.g. Enterprise). */
+  interiorDesignMonthlyLimit?: number | null;
+  interiorDesignRemaining?: number | null;
   inFirstImage3dBonusWindow: boolean;
   publishedLayouts?: boolean;
   customTheme?: boolean;
@@ -34,6 +37,13 @@ export interface PublicSiteTheme {
   accentColor?: string;
   backgroundColor?: string;
   textColor?: string;
+}
+
+export type InteriorDesignCatalogCoverageMode = "percent" | "count";
+
+export interface InteriorDesignCatalogCoverage {
+  mode: InteriorDesignCatalogCoverageMode;
+  value: number;
 }
 
 export interface User {
@@ -67,6 +77,8 @@ export interface User {
   planTier?: string;
   trialEndsAt?: string | null;
   entitlements?: PlanEntitlementsSnapshot;
+  /** AI interior-design catalog usage (count or percent). */
+  interiorDesignCatalogCoverage?: InteriorDesignCatalogCoverage;
 }
 
 export interface SubMode {
@@ -89,6 +101,15 @@ export interface Mode {
   subModes: SubMode[];
 }
 
+export interface FabricPart {
+  /** Stable identifier used as key in fabricPartMaterialIds (e.g. "seat", "back"). */
+  id: string;
+  /** Display label shown in the planner UI (e.g. "Seat", "Back cushion"). */
+  name: string;
+  /** null = all upholstery materials allowed; array = restricted to these material ids. */
+  allowedMaterialIds: string[] | null;
+}
+
 export interface CatalogItem {
   id: string;
   adminId: string;
@@ -108,6 +129,7 @@ export interface CatalogItem {
   currency: string;
   deliveryDays: number;
   category: string;
+  plannerSubcategory?: string | null;
   /** Extra browse / room labels (combined with primary `category`). */
   additionalCategories?: string[];
   /** Merged deduped labels (API convenience). */
@@ -118,11 +140,24 @@ export interface CatalogItem {
   modelStatus?: 'queued' | 'processing' | 'done' | 'failed';
   modelError?: string;
   isActive: boolean;
+  forDesign?: boolean;
+  supportsOutdoorCushions?: boolean;
+  outdoorCushionDefaults?: Record<string, unknown> | null;
+  isFabricCustomizable?: boolean;
+  fabricParts?: FabricPart[];
+  surfaceTextureWidthCm?: number | null;
+  surfaceTextureHeightCm?: number | null;
+  surfaceItemWidthCm?: number | null;
+  surfaceItemHeightCm?: number | null;
+  surfaceLayoutPattern?: 'aligned' | 'staggered' | 'herringbone' | null;
+  /** Pricing unit for building-material catalog items (sqm, meter, piece, roll, box, kg). */
+  unit?: string | null;
   createdAt: string;
 }
 
 /** Which axis of the sheet the grain runs along, or "none" for random-rotatable. */
 export type MaterialGrainDirection = "along_width" | "along_height" | "none";
+export type FloorLayoutPattern = "aligned" | "staggered";
 
 export interface Material {
   id: string;
@@ -158,6 +193,13 @@ export interface Material {
   sheetHeightCm?: number;
   grainDirection?: MaterialGrainDirection;
   kerfMm?: number;
+  /** Real size of one visible repeat/tile/board used by floor planners. */
+  textureWidthCm?: number | null;
+  textureHeightCm?: number | null;
+  /** Sellable item coverage size (box, roll, sheet, tile pack) used for counts/pricing. */
+  productWidthCm?: number | null;
+  productHeightCm?: number | null;
+  floorLayoutPattern?: FloorLayoutPattern | null;
   isActive: boolean;
 }
 
@@ -222,6 +264,10 @@ export interface Module {
   modelStatus?: 'queued' | 'processing' | 'done' | 'failed';
   modelError?: string;
   placementType: 'floor' | 'wall';
+  /** Planner-local kitchen taxonomy when syncing custom modules (published planner). */
+  kitchenModuleType?: string;
+  kitchenDoorPreset?: string;
+  kitchenDoorLeafCount?: number;
   isConfigurableTemplate?: boolean;
   pricingBodyWeight?: number;
   pricingDoorWeight?: number;

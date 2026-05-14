@@ -74,13 +74,15 @@ export default function ModelViewerCard({
   }, [resolvedSrc, alt]);
 
   if (status === "failed") {
-    if (fallbackImage) {
+    const fallbackSrc = fallbackImage ? toRelativeStorageUrl(fallbackImage) : "";
+    if (fallbackSrc) {
       return (
         <Image
-          src={fallbackImage}
+          src={fallbackSrc}
           alt={alt}
           fill
           className="object-cover"
+          unoptimized
         />
       );
     }

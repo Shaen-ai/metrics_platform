@@ -12,7 +12,16 @@ import {
   TreePine,
   Square,
   RectangleHorizontal,
+  Refrigerator,
+  Coffee,
+  Fan,
+  Cpu,
+  LampDesk,
+  Layers,
   LucideIcon,
+  Paintbrush,
+  PanelTop,
+  PanelsTopLeft,
 } from "lucide-react";
 
 const iconMap: Record<string, LucideIcon> = {
@@ -27,6 +36,15 @@ const iconMap: Record<string, LucideIcon> = {
   TreePine,
   Square,
   RectangleHorizontal,
+  Refrigerator,
+  Coffee,
+  Fan,
+  Cpu,
+  LampDesk,
+  Layers,
+  Paintbrush,
+  PanelTop,
+  PanelsTopLeft,
 };
 
 interface ModeIconProps {

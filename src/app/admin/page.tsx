@@ -16,8 +16,9 @@ export default function AdminDashboard() {
 
   if (!currentUser) return null;
   const pendingOrders = orders.filter((o) => o.status === "pending");
-  const acceptedOrders = orders.filter((o) => o.status === "accepted");
-  const totalRevenue = acceptedOrders.reduce((sum, o) => sum + o.totalPrice, 0);
+  const totalRevenue = orders
+    .filter((o) => o.status === "accepted" || o.status === "delivered")
+    .reduce((sum, o) => sum + o.totalPrice, 0);
 
   const stats = [
     {

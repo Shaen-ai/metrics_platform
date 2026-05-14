@@ -39,6 +39,8 @@ export default function ModesPage() {
     const translations: Record<string, { name: string; desc: string }> = {
       furniture: { name: t("modes.furniture"), desc: t("modes.furnitureDesc") },
       "soft-furniture": { name: t("modes.softFurniture"), desc: t("modes.softFurnitureDesc") },
+      "home-tech": { name: t("modes.homeTech"), desc: t("modes.homeTechDesc") },
+      "building-materials": { name: t("modes.buildingMaterials"), desc: t("modes.buildingMaterialsDesc") },
     };
     return translations[slug] || { name: slug, desc: "" };
   };
@@ -60,6 +62,11 @@ export default function ModesPage() {
     "ottomans-poufs": "submodes.ottomansPoufs",
     mattresses: "submodes.mattresses",
     headboards: "submodes.headboards",
+    "building-doors": "submodes.buildingDoors",
+    "building-windows-glazing": "submodes.buildingWindowsGlazing",
+    "building-flooring": "submodes.buildingFlooring",
+    "building-wall-finishes": "submodes.buildingWallFinishes",
+    "building-ceiling-materials": "submodes.buildingCeilingMaterials",
   };
 
   const getSubModeTitle = (subMode: { slug: string; name: string }) => {

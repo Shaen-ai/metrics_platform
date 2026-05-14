@@ -21,10 +21,10 @@ import { useStore } from "@/lib/store";
 import { toRelativeStorageUrl } from "@/lib/utils";
 import { tuneModelViewerVerticalCenter, type ModelViewerFramingSubset } from "@/lib/modelViewerVerticalCenter";
 import {
-  getFirstOversizeFile,
-  isFileOverMaxUpload,
+  MAX_UPLOAD_BYTES,
   isLikelyUploadSizeLimitMessage,
   isMaxUploadError,
+  isModelFileOverMaxUpload,
 } from "@/lib/uploadLimits";
 import { useTranslation } from "@/hooks/useTranslation";
 import {
@@ -38,6 +38,7 @@ import {
   RotateCcw,
   Box,
 } from "lucide-react";
+import { ImageCropDialog } from "@/components/ImageCropDialog";
 
 export type Model3DGeneratorHandle = {
   /** If the user has selected reference images, starts Meshy; otherwise no-op. */
@@ -184,6 +185,7 @@ const Model3DGenerator = forwardRef<Model3DGeneratorHandle | null, Model3DGenera
   const [dragOver, setDragOver] = useState(false);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [pendingImages, setPendingImages] = useState<File[]>([]);
+  const [cropFiles, setCropFiles] = useState<File[] | null>(null);
   const [texturePrompt, setTexturePrompt] = useState("");
   const [modelViewerLoaded, setModelViewerLoaded] = useState(false);
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
@@ -280,20 +282,19 @@ const Model3DGenerator = forwardRef<Model3DGeneratorHandle | null, Model3DGenera
     return stopPolling;
   }, [status, jobId, entityId, entityType, onModelReady, stopPolling]);
 
+  const setPendingImageFiles = (files: File[]) => {
+    imagePreviews.forEach((url) => URL.revokeObjectURL(url));
+    setPendingImages(files);
+    setImagePreviews(files.map((f) => URL.createObjectURL(f)));
+    setTexturePrompt("");
+  };
+
   const handleImageSelect = (files: File[]) => {
     if (files.length === 0) return;
     const imgs = files.filter((f) => f.type.startsWith("image/")).slice(0, 4);
     if (imgs.length === 0) return;
-    if (getFirstOversizeFile(imgs)) {
-      setUploadTooLargeOpen(true);
-      if (imgRef.current) imgRef.current.value = "";
-      return;
-    }
 
-    imagePreviews.forEach((url) => URL.revokeObjectURL(url));
-    setPendingImages(imgs);
-    setImagePreviews(imgs.map((f) => URL.createObjectURL(f)));
-    setTexturePrompt("");
+    setCropFiles(imgs);
   };
 
   const handleImagesCancel = () => {
@@ -403,7 +404,7 @@ const Model3DGenerator = forwardRef<Model3DGeneratorHandle | null, Model3DGenera
   };
 
   const handleGlbUpload = async (file: File) => {
-    if (isFileOverMaxUpload(file)) {
+    if (isModelFileOverMaxUpload(file)) {
       setUploadTooLargeOpen(true);
       if (glbRef.current) glbRef.current.value = "";
       return;
@@ -446,7 +447,7 @@ const Model3DGenerator = forwardRef<Model3DGeneratorHandle | null, Model3DGenera
       .slice(0, 4);
     if (glbs.length > 0) {
       const g = glbs[0];
-      if (isFileOverMaxUpload(g)) {
+      if (isModelFileOverMaxUpload(g)) {
         setUploadTooLargeOpen(true);
         return;
       }
@@ -794,6 +795,18 @@ const Model3DGenerator = forwardRef<Model3DGeneratorHandle | null, Model3DGenera
           )}
         </div>
       )}
+      <ImageCropDialog
+        open={Boolean(cropFiles)}
+        files={cropFiles ?? []}
+        title="Crop AI reference images"
+        maxOutputBytes={MAX_UPLOAD_BYTES}
+        onOutputTooLarge={() => setUploadTooLargeOpen(true)}
+        onCancel={() => setCropFiles(null)}
+        onApply={(files) => {
+          setCropFiles(null);
+          setPendingImageFiles(files.slice(0, 4));
+        }}
+      />
     </div>
   );
 });
