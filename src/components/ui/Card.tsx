@@ -13,7 +13,7 @@ const Card = forwardRef<HTMLDivElement, CardProps>(
       <div
         ref={ref}
         className={cn(
-          "rounded-2xl border border-[var(--border)] bg-white p-6 shadow-sm",
+          "rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-sm",
           variant === "interactive" &&
             "cursor-pointer transition-all duration-200 hover:shadow-lg hover:border-[var(--primary)] hover:-translate-y-0.5",
           className
@@ -78,18 +78,4 @@ const CardContent = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
 
 CardContent.displayName = "CardContent";
 
-const CardFooter = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
-  ({ className, ...props }, ref) => {
-    return (
-      <div
-        ref={ref}
-        className={cn("flex items-center pt-4", className)}
-        {...props}
-      />
-    );
-  }
-);
-
-CardFooter.displayName = "CardFooter";
-
-export { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter };
+export { Card, CardHeader, CardTitle, CardDescription, CardContent };

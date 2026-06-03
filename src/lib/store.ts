@@ -417,6 +417,8 @@ export const useStore = create<AppState>()(
         if (item.surfaceItemHeightCm !== undefined) payload.surface_item_height_cm = item.surfaceItemHeightCm;
         if (item.surfaceLayoutPattern !== undefined) payload.surface_layout_pattern = item.surfaceLayoutPattern;
         if (item.unit !== undefined) payload.unit = item.unit;
+        if (item.productFamily !== undefined) payload.product_family = item.productFamily;
+        if (item.productSubtype !== undefined) payload.product_subtype = item.productSubtype;
         const res = await api.createCatalogItem(payload);
         const newItem = res.data as CatalogItem;
         set((s) => ({ catalogItems: [newItem, ...s.catalogItems] }));
@@ -481,6 +483,8 @@ export const useStore = create<AppState>()(
         if (updates.surfaceItemHeightCm !== undefined) payload.surface_item_height_cm = updates.surfaceItemHeightCm;
         if (updates.surfaceLayoutPattern !== undefined) payload.surface_layout_pattern = updates.surfaceLayoutPattern;
         if (updates.unit !== undefined) payload.unit = updates.unit;
+        if (updates.productFamily !== undefined) payload.product_family = updates.productFamily;
+        if (updates.productSubtype !== undefined) payload.product_subtype = updates.productSubtype;
 
         const res = await api.updateCatalogItem(id, payload);
         const updated = res.data as CatalogItem;

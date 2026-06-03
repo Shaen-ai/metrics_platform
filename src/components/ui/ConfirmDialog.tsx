@@ -86,7 +86,7 @@ export function ConfirmDialog({
 
       <div
         className={cn(
-          "relative w-full max-w-sm rounded-2xl bg-white shadow-2xl border border-[var(--border)] transition-all duration-200",
+          "relative w-full max-w-sm rounded-2xl bg-[var(--card)] shadow-2xl border border-[var(--border)] transition-all duration-200",
           animating
             ? "opacity-100 scale-100 translate-y-0"
             : "opacity-0 scale-95 translate-y-2"

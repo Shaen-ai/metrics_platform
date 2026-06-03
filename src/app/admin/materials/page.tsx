@@ -1151,7 +1151,7 @@ export default function MaterialsPage() {
       <div className="flex flex-col gap-4">
         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold">{t("materials.title")}</h1>
+            <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic' }}>{t("materials.title")}</h1>
             <p className="text-[var(--muted-foreground)]">
               {currentUser?.companyName
                 ? `${t("materials.description")} — ${currentUser.companyName}`
@@ -1194,7 +1194,7 @@ export default function MaterialsPage() {
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-4">
                 {materialFormError && (
-                  <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
+                  <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
                     {materialFormError}
                   </p>
                 )}
@@ -1214,7 +1214,7 @@ export default function MaterialsPage() {
                   </p>
 
                   {visibleProductGroups.length === 0 ? (
-                    <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+                    <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
                       {t("materials.productGroup.noneForMode")}
                     </p>
                   ) : (
@@ -1331,8 +1331,8 @@ export default function MaterialsPage() {
                   </dl>
 
                   {advancedClassificationOpen && (
-                    <div className="space-y-4 rounded-lg border border-amber-200 bg-amber-50/70 p-3 dark:border-amber-900 dark:bg-amber-950/20">
-                      <p className="text-xs text-amber-800 dark:text-amber-200">
+                    <div className="space-y-4 rounded-lg border border-amber-200 bg-amber-50/70 p-3">
+                      <p className="text-xs text-amber-800">
                         {t("materials.internalOverrideWarning")}
                       </p>
 
@@ -1431,7 +1431,7 @@ export default function MaterialsPage() {
                           })}
                         </div>
                         {formData.categories.length === 0 && (
-                          <p className="text-xs text-amber-700 dark:text-amber-300 mt-2">
+                          <p className="text-xs text-amber-700 mt-2">
                             {t("materials.selectAtLeastOneCategory")}
                           </p>
                         )}
@@ -1551,11 +1551,11 @@ export default function MaterialsPage() {
                   )}
 
                   {imageWarnings.length > 0 && (
-                    <div className="mt-2 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800 p-2.5">
+                    <div className="mt-2 rounded-lg border border-amber-300 bg-amber-50 p-2.5">
                       {imageWarnings.map((w, i) => (
                         <div
                           key={i}
-                          className="flex items-start gap-2 text-xs text-amber-800 dark:text-amber-300"
+                          className="flex items-start gap-2 text-xs text-amber-800"
                         >
                           <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
                           <span>{w}</span>
@@ -1965,14 +1965,14 @@ export default function MaterialsPage() {
       )}
 
 
-      <Card className="overflow-hidden border-[#F0E6D8] shadow-sm">
+      <Card className="overflow-hidden border-[var(--border)] shadow-sm">
         <button
           type="button"
           onClick={() => setCatalogExpanded((prev) => !prev)}
           className="flex w-full items-center justify-between gap-3 p-4 sm:p-5 text-left hover:bg-[var(--muted)]/20 transition-colors"
         >
           <div className="flex items-center gap-3 min-w-0">
-            <Library className="w-5 h-5 text-[#C45F1A] shrink-0" aria-hidden />
+            <Library className="w-5 h-5 text-[var(--primary)] shrink-0" aria-hidden />
             <div className="min-w-0">
               <p className="text-sm font-semibold text-[var(--foreground)]">
                 {t("materials.catalogSectionTitle")}
@@ -1992,13 +1992,13 @@ export default function MaterialsPage() {
 
         {catalogExpanded && (
         <div className="space-y-6 border-t border-[var(--border)] p-4 sm:p-6">
-          <div className="relative overflow-hidden rounded-2xl border border-[#F0E6D8] bg-gradient-to-br from-[#FFFBF7] via-white to-[#F7F0E8] p-6 shadow-sm">
+          <div className="relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-sm">
             <div
-              className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-[#E8772E]/[0.12] blur-3xl"
+              className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-[var(--primary)]/[0.12] blur-3xl"
               aria-hidden
             />
             <div className="relative space-y-2 max-w-2xl">
-              <p className="text-sm font-semibold uppercase tracking-wide text-[#C45F1A]">
+              <p className="text-sm font-semibold uppercase tracking-wide text-[var(--primary)]">
                 {t("materials.tabCatalog")}
               </p>
               <h2 className="text-xl font-bold text-[var(--foreground)]">
@@ -2019,10 +2019,10 @@ export default function MaterialsPage() {
                   onClick={() => setCatalogMaterialType("")}
                   className={[
                     "group flex flex-col items-stretch rounded-xl border p-4 text-left transition-all",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E8772E]/40",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]/40",
                     !catalogMaterialType
-                      ? "border-[#E8772E] bg-white shadow-md ring-2 ring-[#E8772E]/25"
-                      : "border-[var(--border)] bg-white/80 hover:border-[#E8772E]/50 hover:shadow-sm",
+                      ? "border-[var(--primary)] bg-[var(--card)] shadow-md ring-2 ring-[var(--primary)]/25"
+                      : "border-[var(--border)] bg-[var(--card)]/80 hover:border-[var(--primary)]/50 hover:shadow-sm",
                     "min-h-[88px]",
                   ].join(" ")}
                 >
@@ -2031,8 +2031,8 @@ export default function MaterialsPage() {
                       className={[
                         "flex h-11 w-11 shrink-0 items-center justify-center rounded-lg transition-colors",
                         !catalogMaterialType
-                          ? "bg-[#FEF3E7] text-[#C45F1A]"
-                          : "bg-[var(--muted)] text-[var(--muted-foreground)] group-hover:bg-[#FEF3E7]/60 group-hover:text-[#C45F1A]",
+                          ? "bg-[var(--accent)] text-[var(--primary)]"
+                          : "bg-[var(--muted)] text-[var(--muted-foreground)] group-hover:bg-[var(--accent)]/60 group-hover:text-[var(--primary)]",
                       ].join(" ")}
                     >
                       <Layers className="h-5 w-5" />
@@ -2057,10 +2057,10 @@ export default function MaterialsPage() {
                       onClick={() => setCatalogMaterialType(value)}
                       className={[
                         "group flex flex-col items-stretch rounded-xl border p-4 text-left transition-all",
-                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E8772E]/40",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]/40",
                         selected
-                          ? "border-[#E8772E] bg-white shadow-md ring-2 ring-[#E8772E]/25"
-                          : "border-[var(--border)] bg-white/80 hover:border-[#E8772E]/50 hover:shadow-sm",
+                          ? "border-[var(--primary)] bg-[var(--card)] shadow-md ring-2 ring-[var(--primary)]/25"
+                          : "border-[var(--border)] bg-[var(--card)]/80 hover:border-[var(--primary)]/50 hover:shadow-sm",
                         featured ? "min-h-[100px]" : "min-h-[88px]",
                       ].join(" ")}
                     >
@@ -2069,8 +2069,8 @@ export default function MaterialsPage() {
                           className={[
                             "flex h-11 w-11 shrink-0 items-center justify-center rounded-lg transition-colors",
                             selected
-                              ? "bg-[#FEF3E7] text-[#C45F1A]"
-                              : "bg-[var(--muted)] text-[var(--muted-foreground)] group-hover:bg-[#FEF3E7]/60 group-hover:text-[#C45F1A]",
+                              ? "bg-[var(--accent)] text-[var(--primary)]"
+                              : "bg-[var(--muted)] text-[var(--muted-foreground)] group-hover:bg-[var(--accent)]/60 group-hover:text-[var(--primary)]",
                           ].join(" ")}
                         >
                           <Icon className="h-5 w-5" />
@@ -2087,7 +2087,7 @@ export default function MaterialsPage() {
             </div>
           </div>
 
-          <Card className="overflow-hidden border-[#F0E6D8] shadow-sm">
+          <Card className="overflow-hidden border-[var(--border)] shadow-sm">
               <CardContent className="p-6 space-y-6">
                 <div className="space-y-3">
                   <p className="text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wide">
@@ -2100,8 +2100,8 @@ export default function MaterialsPage() {
                       className={[
                         "rounded-full px-4 py-2 text-sm font-medium transition-all",
                         !catalogManufacturer
-                          ? "bg-[#E8772E] text-white shadow-sm"
-                          : "border border-[var(--border)] bg-white text-[var(--foreground)] hover:border-[#E8772E]/40",
+                          ? "bg-[var(--primary)] text-[var(--primary-foreground)] shadow-sm"
+                          : "border border-[var(--border)] bg-[var(--card)] text-[var(--foreground)] hover:border-[var(--primary)]/40",
                       ].join(" ")}
                     >
                       {t("materials.allManufacturers")}
@@ -2114,8 +2114,8 @@ export default function MaterialsPage() {
                         className={[
                           "rounded-full px-4 py-2 text-sm font-medium transition-all",
                           catalogManufacturer === m
-                            ? "bg-[#E8772E] text-white shadow-sm"
-                            : "border border-[var(--border)] bg-white text-[var(--foreground)] hover:border-[#E8772E]/40",
+                            ? "bg-[var(--primary)] text-[var(--primary-foreground)] shadow-sm"
+                            : "border border-[var(--border)] bg-[var(--card)] text-[var(--foreground)] hover:border-[var(--primary)]/40",
                         ].join(" ")}
                       >
                         {mfrLabel(m)}
@@ -2183,7 +2183,7 @@ export default function MaterialsPage() {
                                   key={tmpl.id}
                                   className={`overflow-hidden transition-shadow ${
                                     selected
-                                      ? "ring-2 ring-[#E8772E] shadow-md"
+                                      ? "ring-2 ring-[var(--primary)] shadow-md"
                                       : "hover:shadow-md border-[var(--border)]"
                                   }`}
                                 >
@@ -2195,7 +2195,7 @@ export default function MaterialsPage() {
                                     >
                                       <div className="pt-1 text-[var(--muted-foreground)] shrink-0">
                                         {selected ? (
-                                          <CheckSquare className="w-5 h-5 text-[#E8772E]" />
+                                          <CheckSquare className="w-5 h-5 text-[var(--primary)]" />
                                         ) : (
                                           <Square className="w-5 h-5" />
                                         )}
@@ -2305,7 +2305,7 @@ export default function MaterialsPage() {
                     </div>
                   </div>
                   {!importModeId && modes.length > 0 && (
-                    <p className="text-xs text-amber-600 dark:text-amber-500">
+                    <p className="text-xs text-amber-600">
                       {t("materials.importNeedMode")}
                     </p>
                   )}

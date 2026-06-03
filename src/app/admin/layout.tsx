@@ -27,6 +27,7 @@ import { ModeIcon } from "@/components/icons/ModeIcons";
 import { getPricingPageUrl } from "@/lib/billingLinks";
 import { getLandingUrl } from "@/lib/landingUrl";
 import { LanguagePreferenceButton } from "@/components/LanguagePreferenceButton";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 function AdminLoading() {
   return (
@@ -135,13 +136,13 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="min-h-screen bg-[#FFF8F0]">
+    <div className="min-h-screen bg-[var(--background)]">
       {/* Mobile Header */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b border-[#F0E6D8] z-40 flex items-center justify-between px-4">
+      <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-[var(--card)] border-b border-[var(--border)] z-40 flex items-center justify-between px-4">
         <button onClick={() => setSidebarOpen(true)} className="p-2">
-          <Menu className="w-6 h-6 text-[#1A1A1A]" />
+          <Menu className="w-6 h-6 text-[var(--foreground)]" />
         </button>
-        <span className="font-semibold text-[#1A1A1A]">{currentUser?.companyName}</span>
+        <span className="font-semibold text-[var(--foreground)]">{currentUser?.companyName}</span>
         <div className="w-10" />
       </div>
 
@@ -155,31 +156,31 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 z-50 flex h-full w-64 flex-col bg-white border-r border-[#F0E6D8] transform transition-transform lg:translate-x-0 ${
+        className={`fixed top-0 left-0 z-50 flex h-full w-64 flex-col bg-[var(--card)] border-r border-[var(--border)] transform transition-transform lg:translate-x-0 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="p-4 border-b border-[#F0E6D8] flex items-center justify-between">
+        <div className="p-4 border-b border-[var(--border)] flex items-center justify-between">
           <div>
-            <h1 className="font-bold text-lg text-[#1A1A1A]">{currentUser?.companyName}</h1>
-            <p className="text-xs text-[#6B7280]">{currentUser?.email}</p>
+            <h1 className="text-lg text-[var(--foreground)]" style={{ fontFamily: 'var(--font-brand)', fontStyle: 'italic', fontWeight: 300 }}>{currentUser?.companyName}</h1>
+            <p className="text-xs text-[var(--muted-foreground)]">{currentUser?.email}</p>
           </div>
           <button onClick={() => setSidebarOpen(false)} className="lg:hidden p-1">
-            <X className="w-5 h-5 text-[#1A1A1A]" />
+            <X className="w-5 h-5 text-[var(--foreground)]" />
           </button>
         </div>
 
         {/* Current Mode Display */}
         <Link
           href="/admin/modes"
-          className="block m-4 p-3 bg-[#FEF3E7] rounded-xl hover:bg-[#FEF3E7]/80 transition-colors"
+          className="block m-4 p-3 bg-[var(--accent)] rounded-xl hover:bg-[var(--accent)]/80 transition-colors"
         >
           <div className="flex items-center gap-2">
-            {selectedModes[0] && <ModeIcon name={selectedModes[0].icon} className="w-4 h-4 text-[#E8772E]" />}
-            <span className="text-sm font-medium text-[#1A1A1A]">{selectedModeLabel}</span>
-            <ChevronDown className="w-4 h-4 ml-auto text-[#6B7280]" />
+            {selectedModes[0] && <ModeIcon name={selectedModes[0].icon} className="w-4 h-4 text-[var(--primary)]" />}
+            <span className="text-sm font-medium text-[var(--foreground)]">{selectedModeLabel}</span>
+            <ChevronDown className="w-4 h-4 ml-auto text-[var(--muted-foreground)]" />
           </div>
-          <p className="text-xs text-[#E8772E] mt-1">{t("modes.clickToChange")}</p>
+          <p className="text-xs text-[var(--primary)] mt-1">{t("modes.clickToChange")}</p>
         </Link>
 
         {/* Navigation */}
@@ -196,8 +197,8 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
                   onClick={() => setSidebarOpen(false)}
                   className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${
                     isActive
-                      ? "bg-[#FEF3E7] text-[#E8772E] font-medium"
-                      : "text-[#6B7280] hover:bg-[#FEF3E7]/60 hover:text-[#E8772E]"
+                      ? "bg-[var(--accent)] text-[var(--primary)] font-medium"
+                      : "text-[var(--muted-foreground)] hover:bg-[var(--accent)]/60 hover:text-[var(--primary)]"
                   }`}
                 >
                   <item.icon className="w-5 h-5" />
@@ -205,7 +206,7 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
                 </Link>
 
                 {item.href === "/admin/settings" && isSettingsActive && (
-                  <div className="mt-1 ml-8 space-y-0.5 border-l border-[#F0E6D8] pl-2">
+                  <div className="mt-1 ml-8 space-y-0.5 border-l border-[var(--border)] pl-2">
                     {settingsNavItems.map((subItem) => {
                       const SubIcon = subItem.icon;
                       const isSubActive = activeSettingsTab === subItem.tab;
@@ -216,8 +217,8 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
                           onClick={() => setSidebarOpen(false)}
                           className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
                             isSubActive
-                              ? "bg-[#FEF3E7] text-[#E8772E] font-medium"
-                              : "text-[#6B7280] hover:bg-[#FEF3E7]/60 hover:text-[#E8772E]"
+                              ? "bg-[var(--accent)] text-[var(--primary)] font-medium"
+                              : "text-[var(--muted-foreground)] hover:bg-[var(--accent)]/60 hover:text-[var(--primary)]"
                           }`}
                         >
                           <SubIcon className="w-4 h-4 shrink-0" />
@@ -233,20 +234,23 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
         </nav>
 
         {/* Upgrade CTA (above language — higher priority for revenue) */}
-        <div className="shrink-0 space-y-2 border-t border-[#F0E6D8] bg-white p-4">
+        <div className="shrink-0 space-y-2 border-t border-[var(--border)] bg-[var(--card)] p-4">
           {showSidebarUpgrade && (
-            <Button variant="primary" className="w-full font-semibold shadow-sm ring-1 ring-[#E8772E]/30" asChild>
+            <Button variant="primary" className="w-full font-semibold shadow-sm ring-1 ring-[var(--primary)]/30" asChild>
               <a href={upgradePricingUrl} target="_blank" rel="noopener noreferrer">
                 <Crown className="w-4 h-4 mr-2 shrink-0" aria-hidden />
                 {t("nav.upgradePlan")}
               </a>
             </Button>
           )}
-          <LanguagePreferenceButton
-            fallback={currentUser?.language}
-            onChange={(lang) => updateUser({ language: lang } as Partial<import("@/lib/types").User>)}
-            className="flex items-center gap-3 px-3 py-2 w-full rounded-xl text-[#6B7280] hover:bg-[#FEF3E7]/60 hover:text-[#E8772E] transition-colors"
-          />
+          <div className="flex items-center gap-2">
+            <LanguagePreferenceButton
+              fallback={currentUser?.language}
+              onChange={(lang) => updateUser({ language: lang } as Partial<import("@/lib/types").User>)}
+              className="flex items-center gap-3 px-3 py-2 flex-1 rounded-xl text-[var(--muted-foreground)] hover:bg-[var(--accent)]/60 hover:text-[var(--primary)] transition-colors"
+            />
+            <ThemeToggle />
+          </div>
           <Button variant="outline" className="w-full" onClick={handleLogout}>
             <LogOut className="w-4 h-4 mr-2" />
             {t("auth.logout")}

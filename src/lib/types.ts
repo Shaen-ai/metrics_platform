@@ -3,8 +3,6 @@
 /** Mirrors Laravel PlanEntitlements::toPublicArray (camelCase). */
 export interface PlanEntitlementsSnapshot {
   planTier: string;
-  trialEndsAt?: string | null;
-  onTrial: boolean;
   subscriptionActive?: boolean;
   aiChatMonthlyLimit: number | null;
   aiChatRemaining: number | null;
@@ -75,7 +73,6 @@ export interface User {
   customDesignKey?: string | null;
   createdAt: string;
   planTier?: string;
-  trialEndsAt?: string | null;
   entitlements?: PlanEntitlementsSnapshot;
   /** AI interior-design catalog usage (count or percent). */
   interiorDesignCatalogCoverage?: InteriorDesignCatalogCoverage;
@@ -152,6 +149,8 @@ export interface CatalogItem {
   surfaceLayoutPattern?: 'aligned' | 'staggered' | 'herringbone' | null;
   /** Pricing unit for building-material catalog items (sqm, meter, piece, roll, box, kg). */
   unit?: string | null;
+  productFamily?: string | null;
+  productSubtype?: string | null;
   createdAt: string;
 }
 

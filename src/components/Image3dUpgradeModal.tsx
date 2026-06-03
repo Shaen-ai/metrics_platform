@@ -85,19 +85,19 @@ export function Image3dUpgradeModal({
         aria-modal="true"
         aria-labelledby="image3d-upgrade-title"
         className={cn(
-          "relative w-full max-w-md overflow-hidden rounded-2xl border border-violet-200/80 bg-gradient-to-b from-violet-50/95 via-white to-white shadow-2xl shadow-violet-500/10 transition-all duration-200 dark:border-violet-500/20 dark:from-violet-950/90 dark:via-slate-950 dark:to-slate-950",
+          "relative w-full max-w-md overflow-hidden rounded-2xl border border-violet-200/80 bg-gradient-to-b from-violet-50/95 via-[var(--card)] to-[var(--card)] shadow-2xl shadow-violet-500/10 transition-all duration-200",
           animating ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 translate-y-2",
         )}
       >
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -right-20 -top-20 h-48 w-48 rounded-full bg-violet-400/20 blur-3xl dark:bg-violet-500/10" />
-          <div className="absolute -left-16 bottom-0 h-40 w-40 rounded-full bg-fuchsia-400/10 blur-3xl dark:bg-fuchsia-500/5" />
+          <div className="absolute -right-20 -top-20 h-48 w-48 rounded-full bg-violet-400/20 blur-3xl" />
+          <div className="absolute -left-16 bottom-0 h-40 w-40 rounded-full bg-fuchsia-400/10 blur-3xl" />
         </div>
 
         <button
           type="button"
           onClick={onClose}
-          className="absolute right-3 top-3 z-10 rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-violet-100/80 hover:text-slate-800 dark:hover:bg-violet-900/50 dark:hover:text-slate-200"
+          className="absolute right-3 top-3 z-10 rounded-lg p-1.5 text-[var(--muted-foreground)] transition-colors hover:bg-violet-100/80 hover:text-[var(--foreground)]"
           aria-label="Close"
         >
           <X className="h-4 w-4" />
@@ -106,9 +106,9 @@ export function Image3dUpgradeModal({
         <div className="relative px-6 pb-6 pt-8 sm:px-8 sm:pt-10">
           <div className="mb-5 flex flex-col items-center text-center">
             <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-fuchsia-600 p-[1px] shadow-lg shadow-violet-500/25">
-              <div className="flex h-full w-full items-center justify-center rounded-2xl bg-white dark:bg-slate-950">
+              <div className="flex h-full w-full items-center justify-center rounded-2xl bg-[var(--card)]">
                 <div className="relative">
-                  <Box className="h-7 w-7 text-violet-600 dark:text-violet-400" strokeWidth={1.75} />
+                  <Box className="h-7 w-7 text-violet-600" strokeWidth={1.75} />
                   <Sparkles className="absolute -right-1 -top-1 h-4 w-4 text-amber-400" fill="currentColor" />
                 </div>
               </div>
@@ -116,20 +116,20 @@ export function Image3dUpgradeModal({
 
             <h2
               id="image3d-upgrade-title"
-              className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-50"
+              className="text-xl font-semibold tracking-tight text-[var(--foreground)]"
             >
               {isUpgrade ? "Upgrade to use Image-to-3D" : "Image-to-3D limit reached"}
             </h2>
-            <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+            <p className="mt-2 text-sm leading-relaxed text-[var(--muted-foreground)]">
               {isUpgrade
                 ? "Your current plan does not include Image-to-3D generation. Upgrade to create 3D models from photos."
                 : "You've used all Image-to-3D generations included in your plan for this month. Upgrade to create more 3D models from photos, or try again when your usage resets."}
             </p>
           </div>
 
-          <ul className="mb-6 space-y-2.5 rounded-xl border border-violet-100/80 bg-white/60 px-4 py-3 text-left text-sm text-slate-700 dark:border-violet-500/15 dark:bg-violet-950/20 dark:text-slate-300">
+          <ul className="mb-6 space-y-2.5 rounded-xl border border-violet-100/80 bg-[var(--card)]/60 px-4 py-3 text-left text-sm text-[var(--foreground)]">
             <li className="flex items-start gap-2.5">
-              <ArrowUpRight className="mt-0.5 h-4 w-4 shrink-0 text-violet-600 dark:text-violet-400" />
+              <ArrowUpRight className="mt-0.5 h-4 w-4 shrink-0 text-violet-600" />
               <span>
                 {isUpgrade
                   ? "Paid plans include monthly Image-to-3D generations."
@@ -137,7 +137,7 @@ export function Image3dUpgradeModal({
               </span>
             </li>
             <li className="flex items-start gap-2.5">
-              <CalendarClock className="mt-0.5 h-4 w-4 shrink-0 text-violet-600 dark:text-violet-400" />
+              <CalendarClock className="mt-0.5 h-4 w-4 shrink-0 text-violet-600" />
               <span>
                 {isUpgrade
                   ? "Once upgraded, your workspace can generate 3D models directly from product photos."

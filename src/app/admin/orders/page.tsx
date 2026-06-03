@@ -123,13 +123,13 @@ export default function OrdersPage() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case "pending":
-        return "bg-[#FEF3E7] text-[#E8772E]";
+        return "bg-[var(--accent)] text-[var(--primary)]";
       case "confirmed":
         return "bg-blue-100 text-blue-700";
       case "reviewed":
-        return "bg-[#FEF3E7] text-[#E8772E]";
+        return "bg-[var(--accent)] text-[var(--primary)]";
       case "quoted":
-        return "bg-[#FEF3E7] text-[#C9621F]";
+        return "bg-[var(--accent)] text-[var(--primary)]";
       case "accepted":
         return "bg-green-100 text-green-700";
       case "rejected":
@@ -137,7 +137,7 @@ export default function OrdersPage() {
       case "delivered":
         return "bg-emerald-100 text-emerald-800";
       default:
-        return "bg-[#FEF3E7] text-[#6B7280]";
+        return "bg-[var(--accent)] text-[var(--muted-foreground)]";
     }
   };
 
@@ -164,7 +164,7 @@ export default function OrdersPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">{t("orders.title")}</h1>
+        <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic' }}>{t("orders.title")}</h1>
         <p className="text-[var(--muted-foreground)]">{t("orders.description")}</p>
       </div>
 
@@ -219,7 +219,7 @@ export default function OrdersPage() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
             <div
               className={cn(
-                "group relative overflow-hidden rounded-2xl border border-[var(--border)]/60 bg-white p-5",
+                "group relative overflow-hidden rounded-2xl border border-[var(--border)]/60 bg-[var(--card)] p-5",
                 "shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-shadow duration-300 hover:shadow-md",
                 "ring-1 ring-black/[0.03]",
               )}
@@ -234,7 +234,7 @@ export default function OrdersPage() {
             </div>
             <div
               className={cn(
-                "group relative overflow-hidden rounded-2xl border border-[var(--border)]/60 bg-white p-5",
+                "group relative overflow-hidden rounded-2xl border border-[var(--border)]/60 bg-[var(--card)] p-5",
                 "shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-shadow duration-300 hover:shadow-md",
                 "ring-1 ring-black/[0.03]",
               )}
@@ -252,7 +252,7 @@ export default function OrdersPage() {
             </div>
             <div
               className={cn(
-                "group relative overflow-hidden rounded-2xl border border-[var(--border)]/60 bg-white p-5",
+                "group relative overflow-hidden rounded-2xl border border-[var(--border)]/60 bg-[var(--card)] p-5",
                 "shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-shadow duration-300 hover:shadow-md",
                 "ring-1 ring-black/[0.03]",
               )}
@@ -267,7 +267,7 @@ export default function OrdersPage() {
             </div>
             <div
               className={cn(
-                "group relative overflow-hidden rounded-2xl border border-[var(--border)]/60 bg-white p-5",
+                "group relative overflow-hidden rounded-2xl border border-[var(--border)]/60 bg-[var(--card)] p-5",
                 "shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-shadow duration-300 hover:shadow-md",
                 "ring-1 ring-black/[0.03]",
               )}
@@ -340,7 +340,7 @@ export default function OrdersPage() {
       {selectedOrder && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <Card className="w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <CardHeader className="flex flex-row items-center justify-between sticky top-0 bg-white z-10">
+            <CardHeader className="flex flex-row items-center justify-between sticky top-0 bg-[var(--card)] z-10">
               <CardTitle>{t("orders.details")}</CardTitle>
               <button
                 type="button"

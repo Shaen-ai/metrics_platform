@@ -540,8 +540,8 @@ const Model3DGenerator = forwardRef<Model3DGeneratorHandle | null, Model3DGenera
       </label>
 
       {image3dBlocked && (
-        <div className="rounded-xl border border-violet-200/80 bg-gradient-to-r from-violet-50/90 to-fuchsia-50/50 px-3 py-2.5 dark:border-violet-900/50 dark:from-violet-950/40 dark:to-fuchsia-950/20">
-          <p className="text-xs leading-relaxed text-violet-950 dark:text-violet-100">
+        <div className="rounded-xl border border-violet-200/80 bg-gradient-to-r from-violet-50/90 to-fuchsia-50/50 px-3 py-2.5">
+          <p className="text-xs leading-relaxed text-violet-950">
             {image3dBlockReason === "upgrade"
               ? "Upgrade your plan to use Image-to-3D generation."
               : "This month's Image-to-3D generations are used up. You can wait until next month or upgrade for a higher limit."}
@@ -552,7 +552,7 @@ const Model3DGenerator = forwardRef<Model3DGeneratorHandle | null, Model3DGenera
               setUpgradeModalReason(image3dBlockReason ?? "limit");
               setUpgradeModalOpen(true);
             }}
-            className="mt-1.5 text-xs font-medium text-violet-700 underline decoration-violet-300 underline-offset-2 hover:text-violet-900 dark:text-violet-300 dark:hover:text-violet-100"
+            className="mt-1.5 text-xs font-medium text-violet-700 underline decoration-violet-300 underline-offset-2 hover:text-violet-900"
           >
             View plan options
           </button>

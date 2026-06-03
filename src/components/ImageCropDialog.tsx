@@ -279,7 +279,7 @@ export function ImageCropDialog({
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={busy ? undefined : onCancel} />
-      <div className="relative w-full max-w-3xl rounded-2xl bg-white shadow-2xl border border-[var(--border)] overflow-hidden">
+      <div className="relative w-full max-w-3xl rounded-2xl bg-[var(--card)] shadow-2xl border border-[var(--border)] overflow-hidden">
         <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
           <div>
             <h3 className="text-base font-semibold text-[var(--foreground)]">{title}</h3>

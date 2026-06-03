@@ -26,31 +26,31 @@ export default function AdminDashboard() {
       value: catalogItems.length,
       description: t("dashboard.itemsInCatalog"),
       icon: Package,
-      color: "text-[#E8772E]",
-      bgColor: "bg-[#FEF3E7]",
+      color: "text-[var(--primary)]",
+      bgColor: "bg-[var(--accent)]",
     },
     {
       title: t("dashboard.pendingOrders"),
       value: pendingOrders.length,
       description: t("dashboard.ordersAwaiting"),
       icon: Clock,
-      color: "text-[#E8772E]",
-      bgColor: "bg-[#FEF3E7]",
+      color: "text-[var(--primary)]",
+      bgColor: "bg-[var(--accent)]",
     },
     {
       title: t("dashboard.totalRevenue"),
       value: formatPrice(totalRevenue, currentUser.currency),
       description: t("dashboard.fromAccepted"),
       icon: DollarSign,
-      color: "text-[#E8772E]",
-      bgColor: "bg-[#FEF3E7]",
+      color: "text-[var(--primary)]",
+      bgColor: "bg-[var(--accent)]",
     },
   ];
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">{t("dashboard.title")}</h1>
+        <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic' }}>{t("dashboard.title")}</h1>
         <p className="text-[var(--muted-foreground)]">
           {t("auth.welcomeBack")}, {currentUser.name}
         </p>
@@ -59,7 +59,7 @@ export default function AdminDashboard() {
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {stats.map((stat) => (
-          <Card key={stat.title} className="rounded-2xl border-[#F0E6D8]">
+          <Card key={stat.title} className="rounded-2xl border-[var(--border)]">
             <CardContent className="pt-6">
               <div className="flex items-start justify-between">
                 <div>
@@ -117,14 +117,14 @@ export default function AdminDashboard() {
                     <span
                       className={`text-xs px-2 py-1 rounded-full ${
                         order.status === "pending"
-                          ? "bg-[#FEF3E7] text-[#E8772E]"
+                          ? "bg-[var(--accent)] text-[var(--primary)]"
                           : order.status === "accepted"
                           ? "bg-green-100 text-green-700"
                           : order.status === "rejected"
                           ? "bg-red-100 text-red-700"
                           : order.status === "delivered"
                           ? "bg-emerald-100 text-emerald-800"
-                          : "bg-[#FEF3E7] text-[#E8772E]"
+                          : "bg-[var(--accent)] text-[var(--primary)]"
                       }`}
                     >
                       {t(`orders.status${order.status.charAt(0).toUpperCase() + order.status.slice(1)}`)}
@@ -150,7 +150,7 @@ export default function AdminDashboard() {
               </div>
               <Link
                 href="/admin/orders?status=pending"
-                className="px-4 py-2 bg-[#E8772E] text-white rounded-full hover:opacity-90 transition-opacity"
+                className="px-4 py-2 bg-[var(--primary)] text-[var(--primary-foreground)] rounded-full hover:opacity-90 transition-opacity"
               >
                 {t("dashboard.viewPending")}
               </Link>

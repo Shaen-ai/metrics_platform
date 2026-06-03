@@ -567,7 +567,7 @@ export default function ModulesPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">{t("modules.title")}</h1>
+          <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic' }}>{t("modules.title")}</h1>
           <p className="text-[var(--muted-foreground)]">{t("modules.description")}</p>
         </div>
         <Button onClick={() => setShowForm(true)}>
@@ -581,7 +581,7 @@ export default function ModulesPage() {
           role="status"
           className="flex items-start gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-[var(--foreground)]"
         >
-          <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+          <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-600" />
           <p className="flex-1 pt-0.5">{moduleSaveNotice}</p>
           <button
             type="button"

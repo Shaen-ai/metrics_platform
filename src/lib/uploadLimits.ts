@@ -26,13 +26,6 @@ export function isMaxUploadError(err: unknown): err is MaxUploadError {
   return err instanceof MaxUploadError;
 }
 
-/** Any file in the list over max; returns the first or null. */
-export function getFirstOversizeFile(
-  files: { size: number }[]
-): { size: number } | null {
-  return files.find((f) => isFileOverMaxUpload(f)) ?? null;
-}
-
 export function isLikelyUploadSizeLimitMessage(msg: string): boolean {
   const m = msg.toLowerCase();
   if (m.includes("maxupload") || m.includes("max_upload")) return true;

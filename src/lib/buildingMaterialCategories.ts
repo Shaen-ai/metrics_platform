@@ -80,10 +80,6 @@ export const BUILDING_MATERIAL_CATEGORY_GROUPS: BuildingMaterialCategoryGroup[] 
   },
 ];
 
-export const BUILDING_MATERIAL_CATEGORY_VALUES = new Set(
-  BUILDING_MATERIAL_CATEGORY_GROUPS.flatMap((group) => group.items.map((item) => item.value)),
-);
-
 export interface SurfaceSubcategoryOption {
   value: string;
   label: string;

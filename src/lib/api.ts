@@ -517,6 +517,15 @@ class ApiClient {
       body: JSON.stringify(data),
     });
   }
+
+  async exchangeOAuthCode(code: string) {
+    const res = await this.request<{ user: unknown; token: string }>("/auth/oauth/exchange", {
+      method: "POST",
+      body: JSON.stringify({ code }),
+    });
+    this.setToken(res.token);
+    return res;
+  }
 }
 
 export const api = new ApiClient();

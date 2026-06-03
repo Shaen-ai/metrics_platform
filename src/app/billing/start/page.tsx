@@ -66,7 +66,7 @@ function BillingStartInner() {
 
   if (!hydrated) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#FFF8F0] p-4 text-[#6B7280]">
+      <div className="flex min-h-screen items-center justify-center bg-[var(--background)] p-4 text-[var(--muted-foreground)]">
         …
       </div>
     );
@@ -74,11 +74,11 @@ function BillingStartInner() {
 
   if (!parsed) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[#FFF8F0] p-4 text-center">
-        <p className="text-[#1A1A1A]">Invalid or missing plan parameters.</p>
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[var(--background)] p-4 text-center">
+        <p className="text-[var(--foreground)]">Invalid or missing plan parameters.</p>
         <Link
           href={landingPricing}
-          className="font-medium text-[#E8772E] underline"
+          className="font-medium text-[var(--primary)] underline"
         >
           View pricing
         </Link>
@@ -88,11 +88,11 @@ function BillingStartInner() {
 
   if (error) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[#FFF8F0] p-4 text-center">
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[var(--background)] p-4 text-center">
         <p className="max-w-md text-red-600">{error}</p>
         <button
           type="button"
-          className="rounded-full bg-[#E8772E] px-4 py-2 text-sm font-semibold text-white"
+          className="rounded-full bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white"
           onClick={() => {
             checkoutStarted.current = false;
             setError(null);
@@ -108,7 +108,7 @@ function BillingStartInner() {
         </button>
         <Link
           href={landingPricing}
-          className="text-sm font-medium text-[#E8772E] underline"
+          className="text-sm font-medium text-[var(--primary)] underline"
         >
           Back to pricing
         </Link>
@@ -118,14 +118,14 @@ function BillingStartInner() {
 
   if (!isAuthenticated) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#FFF8F0] p-4 text-[#6B7280]">
+      <div className="flex min-h-screen items-center justify-center bg-[var(--background)] p-4 text-[var(--muted-foreground)]">
         Redirecting to sign in…
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#FFF8F0] p-4 text-[#6B7280]">
+    <div className="flex min-h-screen items-center justify-center bg-[var(--background)] p-4 text-[var(--muted-foreground)]">
       Redirecting to secure checkout…
     </div>
   );
@@ -135,7 +135,7 @@ export default function BillingStartPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-[#FFF8F0] p-4 text-[#6B7280]">
+        <div className="flex min-h-screen items-center justify-center bg-[var(--background)] p-4 text-[var(--muted-foreground)]">
           …
         </div>
       }

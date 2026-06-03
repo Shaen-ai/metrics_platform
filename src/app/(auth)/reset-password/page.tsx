@@ -38,19 +38,19 @@ function ResetPasswordForm() {
 
   if (!hydrated || isAuthenticated) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#FFF8F0] p-4">
-        <Loader2 className="h-8 w-8 animate-spin text-[#E8772E]" aria-hidden />
+      <div className="flex min-h-screen items-center justify-center bg-[var(--background)] p-4">
+        <Loader2 className="h-8 w-8 animate-spin text-[var(--primary)]" aria-hidden />
       </div>
     );
   }
 
   if (!email || !token) {
     return (
-      <div className="relative min-h-screen flex items-center justify-center bg-[#FFF8F0] p-4">
-        <LanguagePreferenceButton className="absolute right-4 top-4 flex items-center gap-2 rounded-xl border border-[#F0E6D8] bg-white px-3 py-2 text-sm text-[#6B7280] shadow-sm transition-colors hover:border-[#E8772E] hover:text-[#E8772E]" />
-        <Card className="w-full max-w-md rounded-2xl border-[#F0E6D8] shadow-sm p-6 text-center">
-          <p className="text-[#6B7280] mb-4">{t("auth.verificationInvalid")}</p>
-          <Link href="/forgot-password" className="text-[#E8772E] font-medium hover:underline">
+      <div className="relative min-h-screen flex items-center justify-center bg-[var(--background)] p-4">
+        <LanguagePreferenceButton className="absolute right-4 top-4 flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm text-[var(--muted-foreground)] shadow-sm transition-colors hover:border-[var(--primary)] hover:text-[var(--primary)]" />
+        <Card className="w-full max-w-md rounded-2xl border-[var(--border)] shadow-sm p-6 text-center">
+          <p className="text-[var(--muted-foreground)] mb-4">{t("auth.verificationInvalid")}</p>
+          <Link href="/forgot-password" className="text-[var(--primary)] font-medium hover:underline">
             {t("auth.forgotPasswordTitle")}
           </Link>
         </Card>
@@ -83,13 +83,13 @@ function ResetPasswordForm() {
   };
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center bg-[#FFF8F0] p-4">
-      <LanguagePreferenceButton className="absolute right-4 top-4 flex items-center gap-2 rounded-xl border border-[#F0E6D8] bg-white px-3 py-2 text-sm text-[#6B7280] shadow-sm transition-colors hover:border-[#E8772E] hover:text-[#E8772E]" />
-      <Card className="w-full max-w-md rounded-2xl border-[#F0E6D8] shadow-sm">
+    <div className="relative min-h-screen flex items-center justify-center bg-[var(--background)] p-4">
+      <LanguagePreferenceButton className="absolute right-4 top-4 flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm text-[var(--muted-foreground)] shadow-sm transition-colors hover:border-[var(--primary)] hover:text-[var(--primary)]" />
+      <Card className="w-full max-w-md rounded-2xl border-[var(--border)] shadow-sm">
         <CardHeader className="items-center text-center">
           <Link
             href={getLandingUrl()}
-            className="relative mb-4 h-[200px] w-[min(100%,220px)] shrink-0 rounded-md outline-offset-4 transition-opacity hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#E8772E]"
+            className="relative mb-4 h-[200px] w-[min(100%,220px)] shrink-0 rounded-md outline-offset-4 transition-opacity hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)]"
             aria-label={t("auth.logoHomeAria")}
           >
             <Image
@@ -101,7 +101,7 @@ function ResetPasswordForm() {
               priority
             />
           </Link>
-          <CardTitle className="text-2xl text-[#1A1A1A]">{t("auth.setNewPassword")}</CardTitle>
+          <CardTitle className="text-2xl text-[var(--foreground)]">{t("auth.setNewPassword")}</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -128,7 +128,7 @@ function ResetPasswordForm() {
               {isLoading ? t("auth.resettingPassword") : t("auth.saveNewPassword")}
             </Button>
             <div className="text-center text-sm">
-              <Link href="/login" className="text-[#E8772E] hover:underline font-medium">
+              <Link href="/login" className="text-[var(--primary)] hover:underline font-medium">
                 {t("auth.backToSignIn")}
               </Link>
             </div>
@@ -143,7 +143,7 @@ export default function ResetPasswordPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center bg-[#FFF8F0] p-4 text-[#6B7280]">
+        <div className="min-h-screen flex items-center justify-center bg-[var(--background)] p-4 text-[var(--muted-foreground)]">
           …
         </div>
       }

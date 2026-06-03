@@ -45,6 +45,64 @@ import {
 import { ImageCropDialog } from "@/components/ImageCropDialog";
 import { ErrorReportDialog } from "@/components/ErrorReportDialog";
 
+const PRODUCT_SUBTYPE_OPTIONS: Record<string, { value: string; label: string }[]> = {
+  furniture: [
+    { value: "sofa", label: "Sofa" },
+    { value: "chair", label: "Chair" },
+    { value: "coffee_table", label: "Coffee Table" },
+    { value: "dining_table", label: "Dining Table" },
+    { value: "table", label: "Table" },
+    { value: "desk", label: "Desk" },
+    { value: "bed", label: "Bed" },
+    { value: "storage", label: "Storage" },
+    { value: "wardrobe", label: "Wardrobe" },
+    { value: "tv_stand", label: "TV Stand" },
+    { value: "vase", label: "Vase" },
+    { value: "decorative_plant", label: "Decorative Plant" },
+    { value: "plant_stand", label: "Plant Stand" },
+    { value: "tv", label: "TV" },
+  ],
+  flooring: [
+    { value: "laminate", label: "Laminate" },
+    { value: "parquet", label: "Parquet" },
+    { value: "tile", label: "Tile" },
+    { value: "vinyl", label: "Vinyl" },
+    { value: "rug", label: "Rug" },
+    { value: "carpet", label: "Carpet" },
+    { value: "bath_mat", label: "Bath Mat" },
+  ],
+  lighting: [
+    { value: "ceiling", label: "Ceiling" },
+    { value: "pendant", label: "Pendant" },
+    { value: "floor", label: "Floor" },
+    { value: "table", label: "Table" },
+    { value: "wall", label: "Wall" },
+  ],
+  window_treatments: [
+    { value: "curtain", label: "Curtain" },
+    { value: "blind", label: "Blind" },
+    { value: "sheer", label: "Sheer" },
+  ],
+  walls: [
+    { value: "wallpaper", label: "Wallpaper" },
+    { value: "wall_panel", label: "Wall Panel" },
+    { value: "door", label: "Door" },
+    { value: "mirror", label: "Mirror" },
+  ],
+  home_appliances: [
+    { value: "refrigerator", label: "Refrigerator" },
+    { value: "washing_machine", label: "Washing Machine" },
+    { value: "dishwasher", label: "Dishwasher" },
+    { value: "dryer", label: "Dryer" },
+    { value: "oven", label: "Oven" },
+    { value: "hob", label: "Hob" },
+    { value: "hood", label: "Hood" },
+    { value: "freezer", label: "Freezer" },
+    { value: "microwave", label: "Microwave" },
+    { value: "cooker", label: "Cooker" },
+  ],
+};
+
 function isSubscriptionRequiredError(err: unknown): boolean {
   const message = err instanceof Error ? err.message : "";
   return /active subscription|required to use this feature|subscription is required/i.test(message);
@@ -86,6 +144,8 @@ export default function NewCatalogItemPage() {
     surfaceLayoutPattern: "",
     surfaceSubcategory: "",
     unit: "",
+    productFamily: "",
+    productSubtype: "",
   });
   const [colors, setColors] = useState<
     Array<{ name: string; hex: string }>
@@ -437,6 +497,8 @@ export default function NewCatalogItemPage() {
         surfaceItemHeightCm: formData.surfaceItemHeightCm ? parseFloat(formData.surfaceItemHeightCm) : null,
         surfaceLayoutPattern: (formData.surfaceLayoutPattern as 'aligned' | 'staggered' | 'herringbone') || null,
         unit: formData.unit || null,
+        productFamily: formData.productFamily || null,
+        productSubtype: formData.productSubtype || null,
       });
 
       if (!newItem?.id) {
@@ -600,6 +662,58 @@ export default function NewCatalogItemPage() {
             <p className="text-xs text-[var(--muted-foreground)] -mt-2 mb-1">
               {t("catalog.plannerSubgroupHint")}
             </p>
+
+            {/* ─── Interior Design Category ─── */}
+            <div className="rounded-lg border border-[var(--border)] p-4 space-y-4 bg-[var(--muted)]/20">
+              <p className="text-sm font-medium">Interior Design Category</p>
+              <div>
+                <label className="block text-sm font-medium mb-1.5">
+                  Product Family
+                </label>
+                <select
+                  name="productFamily"
+                  value={formData.productFamily}
+                  onChange={(e) => {
+                    setFormData((prev) => ({
+                      ...prev,
+                      productFamily: e.target.value,
+                      productSubtype: "",
+                    }));
+                  }}
+                  className="w-full h-10 px-3 rounded-lg border border-[var(--input)] bg-[var(--background)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                >
+                  <option value="">Auto-detect</option>
+                  <option value="furniture">Furniture</option>
+                  <option value="flooring">Flooring</option>
+                  <option value="lighting">Lighting</option>
+                  <option value="window_treatments">Window Treatments</option>
+                  <option value="walls">Walls &amp; Surfaces</option>
+                  <option value="home_appliances">Home Appliances</option>
+                  <option value="home_accessories">Home Accessories &amp; Decor</option>
+                </select>
+              </div>
+              {formData.productFamily && formData.productFamily !== "home_accessories" && (
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">
+                    Product Subtype
+                  </label>
+                  <select
+                    name="productSubtype"
+                    value={formData.productSubtype}
+                    onChange={handleChange}
+                    className="w-full h-10 px-3 rounded-lg border border-[var(--input)] bg-[var(--background)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                  >
+                    <option value="">— select —</option>
+                    {PRODUCT_SUBTYPE_OPTIONS[formData.productFamily]?.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <p className="text-xs text-[var(--muted-foreground)]">
+                Override auto-detection for interior design placement. Leave as &quot;Auto-detect&quot; to let the system classify automatically.
+              </p>
+            </div>
 
             <div className={`grid gap-4 ${isBuildingMaterial ? "grid-cols-3" : "grid-cols-2"}`}>
               <Input

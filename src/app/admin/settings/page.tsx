@@ -70,7 +70,7 @@ export default function SettingsPage() {
     <Suspense
       fallback={
         <div className="max-w-2xl mx-auto p-10 flex justify-center items-center min-h-[40vh]">
-          <Loader2 className="w-8 h-8 animate-spin text-[#E8772E]" aria-hidden />
+          <Loader2 className="w-8 h-8 animate-spin text-[var(--primary)]" aria-hidden />
         </div>
       }
     >
@@ -249,12 +249,6 @@ function SettingsPageContent() {
   const effectivePricingUrl = (pricingUrl || `${getLandingUrl()}/pricing`).trim();
   const billingPortalUrl = getBillingPortalUrl();
   const supportEmail = getSubscriptionSupportEmail();
-  const onTrial = ent?.onTrial === true;
-  const trialIso = ent?.trialEndsAt ?? currentUser.trialEndsAt;
-  const trialDateStr =
-    onTrial && trialIso
-      ? new Date(trialIso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })
-      : null;
 
   const handleOpenBillingPortal = async () => {
     setBillingPortalError(null);
@@ -462,8 +456,8 @@ function SettingsPageContent() {
   return (
     <div className="max-w-2xl mx-auto space-y-5">
       <div>
-        <h1 className="text-2xl font-bold text-[#1A1A1A]">{t("settings.title")}</h1>
-        <p className="text-sm text-[#6B7280] mt-1">{t("settings.description")}</p>
+        <h1 className="text-2xl font-bold text-[var(--foreground)]" style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic' }}>{t("settings.title")}</h1>
+        <p className="text-sm text-[var(--muted-foreground)] mt-1">{t("settings.description")}</p>
       </div>
 
       <div
@@ -485,8 +479,8 @@ function SettingsPageContent() {
           </p>
 
           {!canSubscribePublish && (
-            <div className="flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50/90 p-4 dark:border-amber-900/50 dark:bg-amber-950/40 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-sm text-amber-950 dark:text-amber-100">{t("settings.storefrontUpgradeBanner")}</p>
+            <div className="flex flex-col gap-3 rounded-xl border border-[var(--border)] bg-[var(--accent)] p-4 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-[var(--foreground)]">{t("settings.storefrontUpgradeBanner")}</p>
               <Button variant="primary" className="shrink-0 font-semibold" asChild>
                 <a href={effectivePricingUrl} target="_blank" rel="noopener noreferrer">
                   <Crown className="w-4 h-4 mr-2" aria-hidden />
@@ -617,16 +611,11 @@ function SettingsPageContent() {
         <CardContent className="space-y-4">
           <p className="text-sm text-[var(--muted-foreground)]">{t("settings.plan.subtitle")}</p>
 
-          <div className="rounded-xl border border-[var(--border)] bg-gradient-to-br from-violet-50/80 to-transparent dark:from-violet-950/30 p-4">
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--secondary)] p-4">
             <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted-foreground)]">
               {t("settings.plan.current")}
             </p>
             <p className="mt-1 text-xl font-semibold text-[var(--foreground)]">{planLabel}</p>
-            {trialDateStr && (
-              <p className="mt-2 text-sm text-amber-800 dark:text-amber-200">
-                {t("settings.plan.trial").replace("{date}", trialDateStr)}
-              </p>
-            )}
           </div>
 
           {ent && (
@@ -956,7 +945,7 @@ function SettingsPageContent() {
             {!canUseBrandingAndCopy && (
               <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-800">
                 <p className="text-xs">{t("settings.publishedSiteLayoutUpsell")}</p>
-                <Button variant="outline" size="sm" className="mt-3 bg-white" asChild>
+                <Button variant="outline" size="sm" className="mt-3 bg-[var(--card)]" asChild>
                   <a href={effectivePricingUrl} target="_blank" rel="noopener noreferrer">
                     <Crown className="w-4 h-4 mr-2" />
                     {t("settings.viewPlans")}
@@ -969,7 +958,7 @@ function SettingsPageContent() {
           {siteSaveError ? (
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
               <p>{siteSaveError}</p>
-              <Button variant="outline" size="sm" className="mt-3 bg-white" asChild>
+              <Button variant="outline" size="sm" className="mt-3 bg-[var(--card)]" asChild>
                 <a href={effectivePricingUrl} target="_blank" rel="noopener noreferrer">
                   <Crown className="w-4 h-4 mr-2" />
                   {t("settings.viewPlans")}
