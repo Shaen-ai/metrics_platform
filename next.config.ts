@@ -3,6 +3,7 @@ import type { NextConfig } from "next";
 const API_ORIGIN = process.env.NEXT_PUBLIC_API_URL?.replace(/\/api$/, "") || "http://localhost:8000";
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   /** Hide the bottom-left Next.js dev tools indicator (route / bundler bubble) in development */
   devIndicators: false,
   images: {
