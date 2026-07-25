@@ -164,7 +164,7 @@ export default function OrdersPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic' }}>{t("orders.title")}</h1>
+        <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-serif)' }}>{t("orders.title")}</h1>
         <p className="text-[var(--muted-foreground)]">{t("orders.description")}</p>
       </div>
 

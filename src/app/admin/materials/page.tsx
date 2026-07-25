@@ -1151,7 +1151,7 @@ export default function MaterialsPage() {
       <div className="flex flex-col gap-4">
         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic' }}>{t("materials.title")}</h1>
+            <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-serif)' }}>{t("materials.title")}</h1>
             <p className="text-[var(--muted-foreground)]">
               {currentUser?.companyName
                 ? `${t("materials.description")} — ${currentUser.companyName}`

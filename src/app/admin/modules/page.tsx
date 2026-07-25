@@ -567,7 +567,7 @@ export default function ModulesPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic' }}>{t("modules.title")}</h1>
+          <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-serif)' }}>{t("modules.title")}</h1>
           <p className="text-[var(--muted-foreground)]">{t("modules.description")}</p>
         </div>
         <Button onClick={() => setShowForm(true)}>

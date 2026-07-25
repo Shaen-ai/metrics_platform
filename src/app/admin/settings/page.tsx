@@ -456,7 +456,7 @@ function SettingsPageContent() {
   return (
     <div className="max-w-2xl mx-auto space-y-5">
       <div>
-        <h1 className="text-2xl font-bold text-[var(--foreground)]" style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic' }}>{t("settings.title")}</h1>
+        <h1 className="text-2xl font-bold text-[var(--foreground)]" style={{ fontFamily: 'var(--font-serif)' }}>{t("settings.title")}</h1>
         <p className="text-sm text-[var(--muted-foreground)] mt-1">{t("settings.description")}</p>
       </div>
 

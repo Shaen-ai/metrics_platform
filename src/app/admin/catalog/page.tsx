@@ -82,7 +82,7 @@ export default function CatalogPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic' }}>{t("catalog.title")}</h1>
+          <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-serif)' }}>{t("catalog.title")}</h1>
           <p className="text-[var(--muted-foreground)]">{t("catalog.description")}</p>
         </div>
         {hasActiveSubscription ? (

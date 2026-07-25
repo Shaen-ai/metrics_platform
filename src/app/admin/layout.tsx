@@ -162,7 +162,7 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
       >
         <div className="p-4 border-b border-[var(--border)] flex items-center justify-between">
           <div>
-            <h1 className="text-lg text-[var(--foreground)]" style={{ fontFamily: 'var(--font-brand)', fontStyle: 'italic', fontWeight: 300 }}>{currentUser?.companyName}</h1>
+            <h1 className="text-lg text-[var(--foreground)]" style={{ fontFamily: 'var(--font-brand)', fontWeight: 500 }}>{currentUser?.companyName}</h1>
             <p className="text-xs text-[var(--muted-foreground)]">{currentUser?.email}</p>
           </div>
           <button onClick={() => setSidebarOpen(false)} className="lg:hidden p-1">
